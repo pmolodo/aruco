@@ -54,6 +54,7 @@ namespace aruco
 			 * Setting this matrix, the reference corrdinate system will be set in this marker
 			 */
 			void glGetModelViewMatrix(  double modelview_matrix[16])throw(cv::Exception);
+ 
 			/**
 			 */
 			friend bool operator<(const Marker &M1,const Marker&M2)
@@ -77,8 +78,6 @@ namespace aruco
 				return str;
 			}
 			
-		private:
-			void arglCameraViewRH(const double para[3][4], double m_modelview[16], const double scale);
 
 	};
 	
@@ -140,6 +139,8 @@ namespace aruco
 			  * the parameters
 			  */
 			 Mat & getThresholdedImage(){return thres;}
+			 
+			 
 			/**Given the intrinsic camera parameters returns the GL_PROJECTION matrix for opengl.
 			 * PLease NOTE that when using OpenGL, it is assumed no camera distorsion! So, if it is not true, you should have
 			 * undistor image
@@ -167,7 +168,7 @@ namespace aruco
 			 * @param size of out
 			 * @param points 4 corners of the marker in the image in
 			 */
-			int warp(Mat &in,Mat &out,Size size, vector<Point2f> points)throw (cv::Exception);
+			void warp(Mat &in,Mat &out,Size size, vector<Point2f> points)throw (cv::Exception);
 
 			int hammDistMarker(Mat  bits);
 			int mat2id(Mat &bits);
@@ -192,6 +193,9 @@ namespace aruco
 			/**
 			 */
 			bool isInto(Mat &contour,vector<Point2f> &b); 
+			/**
+			 */
+			//bool isInto(vector<Point2f> &a,vector<Point2f> &b);
 			/**
 			 */
 			int perimeter(vector<Point2f> &a);
@@ -239,8 +243,31 @@ namespace aruco
 			static double norm( double a, double b, double c );
 			static double dot(  double a1, double a2, double a3,
 				double b1, double b2, double b3 );
+			
+			
+			static void rotateXAxis(Mat &rotation);
 
 	};
+
+
+/**
+ * Creates an ar marker with the id specified. hamming code is employed 
+ * There are a total of 5 rows of 5 cols each
+ * Each row encodes a total of 2 bits, so there are 2^10 bits:(0-1023) 
+ * Hamming code is employed for error detection/correction
+ * The least significative bytes are first (from left-up to to right-bottom)
+ * Example: id = 110
+ * bin code: 00 01 10 11 10
+ * Marker (least significative bit is the leftmost)
+ * Note: The first bit, is the inverse of the hamming parity. This avoids the 0 0 0 0 0 to be valid
+ * 1st row encodes 00: 1 0 0 0 0 : hex 0x10
+ * 2nd row encodes 01: 1 0 1 1 1 : hex 0x17
+ * 3nd row encodes 10: 0 1 0 0 1 : hex 0x09
+ * 4th row encodes 11: 0 1 1 1 0 : hex 0x0e
+ * 5th row encodes 10: 0 1 0 0 1 : hex 0x09
+ */
+Mat createMarker(int id,int size) throw (cv::Exception); 
+
 
 };
 #endif

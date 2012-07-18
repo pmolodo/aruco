@@ -46,10 +46,10 @@ namespace aruco
 
 		///Do threshold the image and detect contours
 		cv::cvtColor(input,grey,CV_BGR2GRAY);
-		thresHold(_thresMethod,grey,thres); 
+		thresHold(_thresMethod,grey,thres);
 		//pass a copy to findContours because the function modifies it
  		thres.copyTo(thres2);
-		findContours( thres2 , contours2, hierarchy2,CV_RETR_TREE, CV_CHAIN_APPROX_NONE );
+		cv::findContours( thres2 , contours2, hierarchy2,CV_RETR_TREE, CV_CHAIN_APPROX_NONE );
 		vector<Point>  approxCurve;
 		///for each contour, analyze if it is a paralelepiped likely to be the marker
 		for(unsigned int i=0;i<contours2.size();i++)
@@ -65,7 +65,7 @@ namespace aruco
 				{
 // 			  	  cout<<"CO="<<i<<endl;
 // 		drawContour(input,contours2[i],Scalar(120,144,225));
-			  
+
 // 				drawApproxCurve(thres,approxCurve,Scalar(155,155,155));
 // 		  namedWindow("input");
 // 		imshow("input",input);
@@ -96,7 +96,7 @@ namespace aruco
 					}
 				}
 			}
-		} 
+		}
 		///sort the points in anti-clockwise order
 		for(unsigned int i=0;i<MarkerCanditates.size();i++)
 		{
@@ -114,13 +114,13 @@ namespace aruco
 				swap(MarkerCanditates[i][1],MarkerCanditates[i][3]);
 
 			}
-		} 
+		}
 		/// remove these elements whise corners are too close to each other
 		//first detect candidates
-	      
+
 		vector<pair<int,int>  > TooNearCandidates;
 		for(unsigned int i=0;i<MarkerCanditates.size();i++)
-		{ 
+		{
 			// 	cout<<"Marker i="<<i<<MarkerCanditates[i]<<endl;
 			//calculate the average distance of each corner to the nearest corner of the other marker candidate
 			for(unsigned int j=i+1;j<MarkerCanditates.size();j++)
@@ -133,7 +133,7 @@ namespace aruco
 				if (dist< 10){
 				  TooNearCandidates.push_back(pair<int,int>(i,j));
 				}
-			}				
+			}
 		}
 		//mark for removal the element of  the pair with smaller perimeter
 		vector<bool> toRemove (MarkerCanditates.size());
@@ -145,7 +145,6 @@ namespace aruco
 		  else toRemove[TooNearCandidates[i].first]=true;
 		}
 
-  
 		///identify the markers
 		for(unsigned int i=0;i<MarkerCanditates.size();i++)
 		{
@@ -153,7 +152,7 @@ namespace aruco
 			{
 				//Find proyective homography
 				Mat canonicalMarker;
-				warp(input,canonicalMarker,Size(100,100),MarkerCanditates[i]);
+				warp(input,canonicalMarker,Size(50,50),MarkerCanditates[i]);
 				int nRotations;
 				int id=getMarkerId(canonicalMarker,nRotations);
 				if (id!=-1)
@@ -164,7 +163,7 @@ namespace aruco
 					std::rotate(detectedMarkers.back().begin(),detectedMarkers.back().begin()+4-nRotations,detectedMarkers.back().end());
 				}
 			}
-		}  
+		}
 		///refine using subpixel accuracy the  corners
 		if (detectedMarkers.size()>0)
 		{
@@ -172,19 +171,40 @@ namespace aruco
 			for(unsigned int i=0;i<detectedMarkers.size();i++)
 				for(int c=0;c<4;c++)
 					Corners.push_back(detectedMarkers[i][c]);
-			cornerSubPix(grey, Corners,cvSize(5,5), cvSize(-1,-1)   ,cvTermCriteria ( CV_TERMCRIT_ITER,30,0.1 ));
+			cornerSubPix(grey, Corners,cvSize(3,3), cvSize(-1,-1)   ,cvTermCriteria ( CV_TERMCRIT_ITER|CV_TERMCRIT_EPS,15,0.05 ));
 			//copy back
 			for(unsigned int i=0;i<detectedMarkers.size();i++)
 				for(int c=0;c<4;c++)     detectedMarkers[i][c]=Corners[i*4+c];
-		} 
+		}
+		//sort by id
+		std::sort(detectedMarkers.begin(),detectedMarkers.end());
+		//there might be still the case that a marker is detected twice because of the double border indicated earlier,
+		//detect and remove these cases
+		toRemove.resize(detectedMarkers.size());
+		for(unsigned int i=0;i<detectedMarkers.size();i++) toRemove[i]=false;
+
+		for(int i=0;i<int(detectedMarkers.size())-1;i++){
+			if (detectedMarkers[i].id==detectedMarkers[i+1].id && !toRemove[i+1] ){
+				//deletes the one with smaller perimeter
+				if (perimeter(detectedMarkers[i])>perimeter(detectedMarkers[i+1])) toRemove[i+1]=true;
+				else toRemove[i]=true;
+			}
+		}
+		//now, remove
+		vector<Marker>::iterator it=detectedMarkers.begin();
+		for(unsigned int i=0;i<toRemove.size();i++){
+			if (toRemove[i]) it=detectedMarkers.erase(it);
+			else it++;
+		}
 		///detect the position of detected markers if desired
 		if (camMatrix.rows!=0  && markerSizeMeters>0)
 		{
+			double halfSize=markerSizeMeters/2.;
 			CvMat* objPoints=cvCreateMat(4,3,CV_32FC1);
-			cvSet2D(objPoints,0,0,cvScalar(0));cvSet2D(objPoints,0,1,cvScalar(0));cvSet2D(objPoints,0,2,cvScalar(0));
-			cvSet2D(objPoints,3,0,cvScalar(markerSizeMeters));cvSet2D(objPoints,3,1,cvScalar(0));cvSet2D(objPoints,3,2,cvScalar(0));
-			cvSet2D(objPoints,2,0,cvScalar(markerSizeMeters));cvSet2D(objPoints,2,1,cvScalar(markerSizeMeters));cvSet2D(objPoints,2,2,cvScalar(0));
-			cvSet2D(objPoints,1,0,cvScalar(0));cvSet2D(objPoints,1,1,cvScalar(markerSizeMeters));cvSet2D(objPoints,1,2,cvScalar(0));
+			cvSet2D(objPoints,1,0,cvScalar(-halfSize));cvSet2D(objPoints,1,1,cvScalar(halfSize));cvSet2D(objPoints,1,2,cvScalar(0));
+			cvSet2D(objPoints,2,0,cvScalar(halfSize));cvSet2D(objPoints,2,1,cvScalar(halfSize));cvSet2D(objPoints,2,2,cvScalar(0));
+			cvSet2D(objPoints,3,0,cvScalar(halfSize));cvSet2D(objPoints,3,1,cvScalar(-halfSize));cvSet2D(objPoints,3,2,cvScalar(0));
+			cvSet2D(objPoints,0,0,cvScalar(-halfSize));cvSet2D(objPoints,0,1,cvScalar(-halfSize));cvSet2D(objPoints,0,2,cvScalar(0));
 
 			CvMat *imagePoints=cvCreateMat(4,2,CV_32FC1);
 
@@ -199,13 +219,15 @@ namespace aruco
 			{					 //Set image points from the marker
 				for(int c=0;c<4;c++)
 				{
-					cvSet2D( imagePoints,c,0,cvScalar(detectedMarkers[i][c].x));
-					cvSet2D( imagePoints,c,1,cvScalar(detectedMarkers[i][c].y));
+					cvSet2D( imagePoints,c,0,cvScalar(detectedMarkers[i][c%4].x));
+					cvSet2D( imagePoints,c,1,cvScalar(detectedMarkers[i][c%4].y));
 				}
 
 				CvMat cvRvec=detectedMarkers[i].Rvec;
 				CvMat cvTvec=detectedMarkers[i].Tvec;
 				cvFindExtrinsicCameraParams2(objPoints, imagePoints, &cvCamMatrix, &cvDistCoeffs,&cvRvec,&cvTvec);
+				//rotate the X axis so that Y is perpendicular to the marker plane
+ 				rotateXAxis(detectedMarkers[i].Rvec);
 				detectedMarkers[i].ssize=markerSizeMeters;
 
 			}
@@ -213,8 +235,7 @@ namespace aruco
 			cvReleaseMat(&imagePoints);
 
 		}
-		//sort by id
-		std::sort(detectedMarkers.begin(),detectedMarkers.end());
+
 
 	}
 
@@ -275,7 +296,7 @@ namespace aruco
 			cv::rectangle(in,contour[i],contour[i],color);
 		}
 	}
-	
+
 	void  ArMarkerDetector:: drawApproxCurve(Mat &in,vector<Point>  &contour,Scalar color  )
 	{
 	  	for(int i=0;i<contour.size();i++)
@@ -307,7 +328,7 @@ namespace aruco
 	 *
 	 ************************************/
 
-	int ArMarkerDetector::warp(Mat &in,Mat &out,Size size, vector<Point2f> points)throw (cv::Exception)
+	void ArMarkerDetector::warp(Mat &in,Mat &out,Size size, vector<Point2f> points)throw (cv::Exception)
 	{
 
 		if (points.size()!=4)    throw cv::Exception(9000,"point.size()!=4","PerpectiveWarper::warp",__FILE__,__LINE__);
@@ -320,7 +341,7 @@ namespace aruco
 		pointsRes[3]= Point2f(0,size.height-1);
 		//        cout<<pointsIn[0].x<< " "<<pointsIn[0].y<<
 		Mat M=getPerspectiveTransform(pointsIn,pointsRes);
-		warpPerspective(in, out,  M, size);
+		cv::warpPerspective(in, out,  M, size);
 
 	}
 	/************************************
@@ -471,18 +492,18 @@ namespace aruco
 		else cv::cvtColor(in,grey,CV_BGR2GRAY);
 		//threshold image
 		threshold(grey, grey,125, 255, THRESH_BINARY|THRESH_OTSU);
-		
-		
-		
+
+
+
 		//   namedWindow("m");
 		//   imshow("m",in);
 		/*
  	         namedWindow("m2");
 		 imshow("m2",grey); */
-		 
+
 		//Markers  are divided in 7x7 regions, of which the inner 5x5 belongs to marker info
 		//the external border shoould be entirely black
-		
+
  		int swidth=in.rows/7;
 		for(int y=0;y<7;y++)
 		{
@@ -500,12 +521,12 @@ namespace aruco
 			  }
 			}
 		}
-		
-		//now, 
+
+		//now,
 		vector<int> markerInfo(5);
 		Mat _bits=Mat::zeros(5,5,CV_8UC1);
 		//get information(for each inner square, determine if it is  black or white)
-		
+
 		for(int y=0;y<5;y++)
 		{
 			int val=0;
@@ -519,7 +540,7 @@ namespace aruco
 			}
 		}
 // 		printMat<uchar>( _bits,"or mat");
-		
+
 		//checkl all possible rotations
 		Mat _bitsFlip;
 		Mat Rotations[4];
@@ -553,7 +574,25 @@ namespace aruco
 			  waitKey(0);
 			   return mat2id(Rotations [ minDist.second]);*/
 	}
+	/************************************
+	 *
+	 *
+	 *
+	 *
 
+	bool ArMarkerDetector::isInto(vector<Point2f> &a,vector<Point2f> &b)
+	{//NOT TESTED
+		 	  CvMat  contour(b.size(),1,CV_32FC2);
+			  float *ptr=contour.ptr<float>(0);
+			  for(unsigned int i=0;i<a.size();i++){
+				*(ptr++)=b[i].x;
+				*(ptr++)=b[i].y;
+			}
+		for(unsigned int i=0;i<b.size();i++)
+			if ( pointPolygonTest( contour,b[i],false)>0) return true;
+		return false;
+	}
+*/
 	/************************************
 	 *
 	 *
@@ -562,14 +601,6 @@ namespace aruco
 	 ************************************/
 	bool ArMarkerDetector::isInto(Mat &contour,vector<Point2f> &b)
 	{
-		/*	  CvMat mat=contour;
-			  CvPoint2D32f p;
-			  for(unsigned int i=0;i<b.size();i++){
-				p.x=b[i].x;
-				p.y=b[i].y;
-				if (cvPointPolygonTest(&mat,p,0)<0) return false;
-			  }
-			  return true;*/
 
 		for(unsigned int i=0;i<b.size();i++)
 			if ( pointPolygonTest( contour,b[i],false)>0) return true;
@@ -833,40 +864,37 @@ namespace aruco
 		para[0][3]=Tvec.at<float>(0,0);
 		para[1][3]=Tvec.at<float>(1,0);
 		para[2][3]=Tvec.at<float>(2,0);
+		double scale=1;
 
-		arglCameraViewRH(para,modelview_matrix,1 );
-
-	}
-
-	void Marker::arglCameraViewRH(const double para[3][4], double m_modelview[16], const double scale)
-	{
-								 // R1C1
-		m_modelview[0 + 0*4] = para[0][0];
+		modelview_matrix[0 + 0*4] = para[0][0];
 								 // R1C2
-		m_modelview[0 + 1*4] = para[0][1];
-		m_modelview[0 + 2*4] = para[0][2];
-		m_modelview[0 + 3*4] = para[0][3];
+		modelview_matrix[0 + 1*4] = para[0][1];
+		modelview_matrix[0 + 2*4] = para[0][2];
+		modelview_matrix[0 + 3*4] = para[0][3];
 								 // R2
-		m_modelview[1 + 0*4] = para[1][0];
-		m_modelview[1 + 1*4] = para[1][1];
-		m_modelview[1 + 2*4] = para[1][2];
-		m_modelview[1 + 3*4] = para[1][3];
+		modelview_matrix[1 + 0*4] = para[1][0];
+		modelview_matrix[1 + 1*4] = para[1][1];
+		modelview_matrix[1 + 2*4] = para[1][2];
+		modelview_matrix[1 + 3*4] = para[1][3];
 								 // R3
-		m_modelview[2 + 0*4] = -para[2][0];
-		m_modelview[2 + 1*4] = -para[2][1];
-		m_modelview[2 + 2*4] = -para[2][2];
-		m_modelview[2 + 3*4] = -para[2][3];
-		m_modelview[3 + 0*4] = 0.0;
-		m_modelview[3 + 1*4] = 0.0;
-		m_modelview[3 + 2*4] = 0.0;
-		m_modelview[3 + 3*4] = 1.0;
+		modelview_matrix[2 + 0*4] = -para[2][0];
+		modelview_matrix[2 + 1*4] = -para[2][1];
+		modelview_matrix[2 + 2*4] = -para[2][2];
+		modelview_matrix[2 + 3*4] = -para[2][3];
+		modelview_matrix[3 + 0*4] = 0.0;
+		modelview_matrix[3 + 1*4] = 0.0;
+		modelview_matrix[3 + 2*4] = 0.0;
+		modelview_matrix[3 + 3*4] = 1.0;
 		if (scale != 0.0)
 		{
-			m_modelview[12] *= scale;
-			m_modelview[13] *= scale;
-			m_modelview[14] *= scale;
+			modelview_matrix[12] *= scale;
+			modelview_matrix[13] *= scale;
+			modelview_matrix[14] *= scale;
 		}
+
+
 	}
+
 
 	void Marker::draw(Mat &in, Scalar color, int lineWidth ,bool writeId)
 	{
@@ -891,4 +919,49 @@ namespace aruco
 		  putText(in,cad, cent,FONT_HERSHEY_SIMPLEX, 0.5,  Scalar(255-color[0],255-color[1],255-color[2]),2);
 		}
 	}
+
+	/**
+	*/
+Mat createMarker(int id,int size) throw (cv::Exception)
+{
+  if (id>=1024) throw cv::Exception(9010,"id>=1024","createMarker",__FILE__,__LINE__);
+  Mat marker(size,size, CV_8UC1);
+  marker.setTo(Scalar(0));
+  //for each line, create
+  int swidth=size/7;
+  int ids[4]={0x10,0x17,0x09,0x0e};
+  for(int y=0;y<5;y++){
+    int index=(id>>2*(4-y)) & 0x0003;
+    int val=ids[index];
+    for(int x=0;x<5;x++){
+	Mat roi=marker(Rect((x+1)* swidth,(y+1)* swidth,swidth,swidth));
+	if ( ( val>>(4-x) ) & 0x0001 ) roi.setTo(Scalar(255));
+	else roi.setTo(Scalar(0));
+    }
+  }
+  return marker;
+}
+
+
+void ArMarkerDetector::rotateXAxis(Mat &rotation)
+{
+        cv::Mat R(3,3,CV_32FC1);
+	Rodrigues(rotation, R);
+	 //create a rotation matrix for x axis
+	  cv::Mat RX=cv::Mat::eye(3,3,CV_32FC1);
+	  float angleRad=M_PI/2;
+	  RX.at<float>(1,1)=cos(angleRad);
+	  RX.at<float>(1,2)=-sin(angleRad);
+	  RX.at<float>(2,1)=sin(angleRad);
+	  RX.at<float>(2,2)=cos(angleRad);
+	  //now multiply
+	  R=R*RX;
+ 	//finally, the the rodrigues back
+	  Rodrigues(R,rotation);
+
+
+}
+
+
+
 };

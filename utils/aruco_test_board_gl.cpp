@@ -5,21 +5,27 @@
 #include <GL/gl.h>
 #include <GL/glut.h>
 #include "aruco.h"
+#include "arucoboard.h"
+#include "common.h"
 using namespace cv;
 using namespace aruco;
 
-string TheInputVideo;
-string TheIntrinsicFile;
+string TheInputVideo,TheIntrinsicFile,TheBoardConfigFile;
+
 bool The3DInfoAvailable=false;
 float TheMarkerSize=-1;
-ArMarkerDetector PPDetector;
+ArMarkerDetector MDetector;
+ArBoardDetector BDetector;
 VideoCapture TheVideoCapturer;
 vector<Marker> TheMarkers;
+//board
+ArBoardDetector TheBoardDetector;
+pair<Board,float> TheBoardDetected; //the board and its probabilit
+BoardConfiguration TheBoardConfig;
 Mat TheInputImage,TheUndInputImage;
 Mat TheIntriscCameraMatrix,TheDistorsionCameraParams,TheResizedImage;
 Size TheGlWindowSize;
 bool TheCaptureFlag=true;
-bool readIntrinsicFile(string TheIntrinsicFile,Mat & TheIntriscCameraMatrix,Mat &TheDistorsionCameraParams,Size size);
 void readArguments ( int argc,char **argv );
 void usage();
 void vDrawScene();
@@ -37,11 +43,20 @@ int main(int argc,char **argv)
 {
 	try
 	{
+		if(argc==1) usage();
 		readArguments (argc,argv);
 		if (TheIntrinsicFile==""){cerr<<"-f option required"<<endl;return -1;}
 		if (TheMarkerSize==-1){cerr<<"-s option required"<<endl;return -1;}
-								 //read from camera
-		if (TheInputVideo=="") TheVideoCapturer.open(0);
+		if(TheBoardConfigFile==""){
+		  cerr<<"The board configuration info must be provided (-b option)"<<endl;
+		  return -1;
+		}
+		//read board configuration
+		TheBoardConfig.readFromFile(TheBoardConfigFile);
+
+		//Open video input source
+		if (TheInputVideo=="")  //read from camera
+		  TheVideoCapturer.open(0);
 		else TheVideoCapturer.open(TheInputVideo);
 		if (!TheVideoCapturer.isOpened())
 		{
@@ -68,7 +83,7 @@ int main(int argc,char **argv)
 		glutDisplayFunc( vDrawScene );
 		glutIdleFunc( vIdle );
 		glutReshapeFunc( vResize );
-		 glutMouseFunc(vMouse);
+		glutMouseFunc(vMouse);
 		glClearColor( 0.0, 0.0, 0.0, 1.0 );
 		glClearDepth( 1.0 );
 		TheGlWindowSize=TheInputImage.size();
@@ -108,13 +123,13 @@ void axis(float size)
     glColor3f (1,0,0 );
     glBegin(GL_LINES);
     glVertex3f(0.0f, 0.0f, 0.0f); // origin of the line
-    glVertex3f(0.0f, size, 0.0f); // ending point of the line
+    glVertex3f(size,0.0f, 0.0f); // ending point of the line
     glEnd( );
 
     glColor3f ( 0,1,0 );
     glBegin(GL_LINES);
     glVertex3f(0.0f, 0.0f, 0.0f); // origin of the line
-    glVertex3f(size, 0.0f, 0.0f); // ending point of the line
+    glVertex3f( 0.0f,size, 0.0f); // ending point of the line
     glEnd( );
 
 
@@ -124,7 +139,6 @@ void axis(float size)
     glVertex3f(0.0f, 0.0f, size); // ending point of the line
     glEnd( );
 
- 
 
 }
 /************************************
@@ -135,6 +149,8 @@ void axis(float size)
  ************************************/
 void vDrawScene()
 {
+	if (TheResizedImage.rows==0) //prevent from going on until the image is initialized
+	  return;
 	///clear
 	glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
 	///draw image in the buffer
@@ -155,24 +171,38 @@ void vDrawScene()
 	ArMarkerDetector::glGetProjectionMatrix(TheIntriscCameraMatrix,TheInputImage.size(),TheGlWindowSize,proj_matrix,0.05,10);
 	glLoadIdentity();
 	glLoadMatrixd(proj_matrix);
-
-	//now, for each marker, 
+	glLineWidth(2);
+	//now, for each marker,
 	double modelview_matrix[16];
+
 	for(unsigned int m=0;m<TheMarkers.size();m++)
 	{
 		TheMarkers[m].glGetModelViewMatrix(modelview_matrix);
 		glMatrixMode(GL_MODELVIEW);
 		glLoadIdentity();
-		glLoadMatrixd(modelview_matrix);	
-		
-				
-//		axis(TheMarkerSize);
+		glLoadMatrixd(modelview_matrix);
+
+
+// 		axis(TheMarkerSize);
 
 		glColor3f(1,0.4,0.4);
-		glTranslatef(TheMarkerSize/2, TheMarkerSize/2,TheMarkerSize/2);
+		glTranslatef(0, TheMarkerSize/2,0);
 		glPushMatrix();
  		glutWireCube( TheMarkerSize );
 
+		glPopMatrix();
+	}
+	//If the board is detected with enough probability
+	if (TheBoardDetected.second>0.3){
+	  TheBoardDetected.first.glGetModelViewMatrix(modelview_matrix);
+		glMatrixMode(GL_MODELVIEW);
+		glLoadIdentity();
+		glLoadMatrixd(modelview_matrix);
+		glColor3f(0,1,0);
+		glTranslatef(0, TheMarkerSize/2,0);
+		glPushMatrix();
+ 		glutWireCube( TheMarkerSize );
+		axis(TheMarkerSize);
 		glPopMatrix();
 	}
 
@@ -197,9 +227,12 @@ void vIdle()
 	//remove distorion in image
 	cv::undistort(TheInputImage,TheUndInputImage, TheIntriscCameraMatrix, TheDistorsionCameraParams);
 	//detect markers
-	PPDetector.detect(TheUndInputImage,TheMarkers,TheIntriscCameraMatrix,Mat(),TheMarkerSize);
+	MDetector.detect(TheUndInputImage,TheMarkers,TheIntriscCameraMatrix,Mat(),TheMarkerSize);
+	//Detection of the board
+	TheBoardDetected.second=TheBoardDetector.detect( TheMarkers, TheBoardConfig,TheBoardDetected.first, TheIntriscCameraMatrix,TheDistorsionCameraParams,TheMarkerSize);
+	//chekc the speed by calculating the mean speed of all iterations
 	//resize the image to the size of the GL window
-	cv::resize(TheUndInputImage,TheResizedImage,TheGlWindowSize);	
+	cv::resize(TheUndInputImage,TheResizedImage,TheGlWindowSize);
   }
   glutPostRedisplay();
 }
@@ -214,6 +247,16 @@ void vIdle()
 void vResize( GLsizei iWidth, GLsizei iHeight )
 {
 	TheGlWindowSize=Size(iWidth,iHeight);
+	//not all sizes are allowed. OpenCv images have padding at the end of each line in these that are not aligned to 4 bytes
+	if (iWidth*3%4!=0){
+	  iWidth+=iWidth*3%4;//resize to avoid padding
+	  vResize(iWidth,TheGlWindowSize.height);
+	}
+	else{
+	  //resize the image to the size of the GL window
+	  if (TheUndInputImage.rows!=0)
+	    cv::resize(TheUndInputImage,TheResizedImage,TheGlWindowSize);
+	}
 }
 
 
@@ -225,7 +268,11 @@ void vResize( GLsizei iWidth, GLsizei iHeight )
  ************************************/
 void usage()
 {
-	cout<<"This program allows \n\n";
+	cout<<"This program test the ArUco Library \n\n";
+	cout<<"-i <video.avi>: specifies a input video file. If not, images from camera are captures"<<endl;
+	cout<<"-f <file>: if you have calibrated your camera, pass calibration information here so as to be able to get 3D marker info"<<endl;
+	cout<<"-b <boardConfiguration.abc>: file with the board configuration"<<endl;
+	cout<<"-s <size>: size of the marker's sides (expressed in meters!)"<<endl;
 }
 
 
@@ -235,7 +282,7 @@ void usage()
  *
  *
  ************************************/
-static const char short_options [] = "hi:f:s:";
+static const char short_options [] = "hi:f:s:b:";
 
 static const struct option
 long_options [] =
@@ -244,6 +291,7 @@ long_options [] =
 	{ "input",     required_argument,   NULL,           'i' },
 	{ "intFile",     required_argument,   NULL,           'f' },
 	{ "size",     required_argument,   NULL,           's' },
+	{ "boardFile",     required_argument,   NULL,           'b' },
 
 	{ 0, 0, 0, 0 }
 };
@@ -283,6 +331,9 @@ void readArguments ( int argc,char **argv )
 			case 's':
 				TheMarkerSize=atof(optarg);
 				break;
+			case 'b':
+				TheBoardConfigFile=optarg;
+				break;
 			default:
 				usage ();
 				exit ( EXIT_FAILURE );
@@ -291,87 +342,3 @@ void readArguments ( int argc,char **argv )
 
 }
 
-
-/************************************
- *
- *
- *
- *
- ************************************/
-bool readIntrinsicFile(string TheIntrinsicFile,Mat & TheIntriscCameraMatrix,Mat &TheDistorsionCameraParams,Size size)
-{
-	ifstream InFile(TheIntrinsicFile.c_str());
-	if (!InFile) return false;
-	char line[1024];
-	InFile.getline(line,1024);	 //skype first
-	InFile.getline(line,1024);
-	stringstream InLine;
-	InLine<<line;
-	TheDistorsionCameraParams.create(4,1,CV_32FC1);
-
-	TheIntriscCameraMatrix=Mat::eye(3,3,CV_32FC1);
-
-								 //fx
-	InLine>>TheIntriscCameraMatrix.at<float>(0,0);
-								 //fy
-	InLine>>TheIntriscCameraMatrix.at<float>(1,1);
-								 //cx
-	InLine>>TheIntriscCameraMatrix.at<float>(0,2);
-								 //cy
-	InLine>>TheIntriscCameraMatrix.at<float>(1,2);
-	for(int i=0;i<4;i++)
-		InLine>>TheDistorsionCameraParams.at<float>(i,0);
-	//now, read the camera size
-	float width,height;
-	InLine>>width>>height;
-	//resize the camera parameters to fir this image size
-	float AxFactor= float(size.width)/ width;
-	float AyFactor= float(size.height)/ height;
-	TheIntriscCameraMatrix.at<float>(0,0)*=AxFactor;
-	TheIntriscCameraMatrix.at<float>(0,2)*=AxFactor;
-	TheIntriscCameraMatrix.at<float>(1,1)*=AyFactor;
-	TheIntriscCameraMatrix.at<float>(1,2)*=AyFactor;
-
-	//debug
-	cout<<"fx="<<TheIntriscCameraMatrix.at<float>(0,0)<<endl;
-	cout<<"fy="<<TheIntriscCameraMatrix.at<float>(1,1)<<endl;
-	cout<<"cx="<<TheIntriscCameraMatrix.at<float>(0,2)<<endl;
-	cout<<"cy="<<TheIntriscCameraMatrix.at<float>(1,2)<<endl;
-	cout<<"k1="<<TheDistorsionCameraParams.at<float>(0,0)<<endl;
-	cout<<"k2="<<TheDistorsionCameraParams.at<float>(0,1)<<endl;
-	cout<<"p1="<<TheDistorsionCameraParams.at<float>(0,2)<<endl;
-	cout<<"p2="<<TheDistorsionCameraParams.at<float>(0,3)<<endl;
-
-	return true;
-}
-
-
-/*
-
-void argDispImageDrawPixels( unsigned char *image, int xwin=0, int ywin=0 )
-{
-	float    sx, sy;
-	GLfloat  zoom;
-
-	if( xwin == 0 && ywin == 0 ) {
-	zoom = 1;
-		sx = 0;
-		sy = gWinYsize - 0.5;
-	}
-	else if( xwin == 1 && ywin == 0 ) {
-	zoom = 1;
-		sx = gXsize;
-		sy = gWinYsize - 0.5;
-	}
-	else {
-		zoom = gZoom / (double)GMINI;
-		sx = (xwin-1)*gMiniXsize;
-		sy = gWinYsize - gYsize - (ywin-1)*gMiniYsize - 0.5;
-	}
-	glDisable(GL_TEXTURE_2D);
-	glPixelZoom( zoom, -zoom);
-	glRasterPos3f( sx, sy, -1.0 );
-
-	glDrawPixels( gImXsize, gImYsize, GL_BGR, GL_UNSIGNED_BYTE, image );
-
-}*/

@@ -19,38 +19,61 @@ and error detection/correction (error correction is yet to be done). As a conclu
 information wich allows 1024 different markers.
 
 
-The library comes with three applications:
- -aruco_create_marker: which creates marker and saves it in a jpg file you can print.
+BOARDS
+
+Aruco allows the possibility to employ board. Boards are markers composed by an array of markers arranged in a known order. The advantages of using boards
+instead of simple markers are:
+ -) More robusteness. The misdetection of several markers of the board is not a problem as long as a minimum set of them are detected.
+ -) More precision. Since there are a larger number of corners, camera pose estimation becomes more precise.
+
+
+APPLICATIONS
+
+The library comes with five applications that will help you to learn how to use the library:
+ 
+-aruco_create_marker: which creates marker and saves it in a jpg file you can print.
  -aruco_test: this is the main application for detection. It reads images either from the camera of from a video and detect markers.
                Additionally, if you provide the intrinsics of the camera(obtained by OpenCv calibration) and the size of the marker in meters,
 	       the library calculates the marker intrinsics so that you can easily create your AR applications.
  -aruco_test_gl: shows how to use the library AR applications using OpenGL for rendering
 
+ -aruco_create_board: application that helps you to create a board
+ -arucro_test_board: application that detects boards
+ -arucro_test_board_gl: application that detects boards and uses OpenGL to draw
+
+
 LIBRARY DESCRIPTION:
 
-Thea ArUco library is contained in two files: aruco.cpo and aruco.h 
+The ArUco library contents are divided in two main directories. The src directory, which contains the library itself. And the utils directory which contains the applications.
 
-They contain two classes:
+The library has four files. 
+
+First, the aruco.cpp and aruco.h. These contains the code of the two classes for detecting markers:
    - Marker: which represent a marker detected in the image
    - ArMarkerDetector: that is in charge of deteting the markers in a image
-Detection is done by simple calling the member funcion ArMarkerDetector::detect()
+Detection is done by simple calling the member funcion ArMarkerDetector::detect(). Additionally, the classes contain members to create the required matrices for rendering using OpenGL. See aruco_test_gl for details
 
-Additionally, the classes contain members to create the required matrices for rendering using OpenGL. See aruco_test_gl for details
+Second, the arucoboard.h and arucoboard.cpp which defines the following classes
+   -BoardConfiguracion: A board is an array of markers in a known order. BoardConfiguracion is the class that defines a board by indicating the id of its markers. In addition, it has informacion about the 
+    distance between the markers so that extrinsica camera computations can be done.
+   -Board: This class defines a board detected in a image. The board has the extrinsic camera parameters as public atributes. In addition, it has a method that allows obtain the matrix for getting its position in OpenGL (see aruco_test_board_gl for details).
+   -ArBoardDetector : This is the class in charge of detecting a board in a image. You must pass to it the set of markers detected by ArMarkerDetector and the BoardConfiguracion of the board you want to detect. 
+      This class will do the rest for you, even calculating the camera extrinsics.
+
+
+COMPILING THE LIBRARY:
+
+Go to the aruco library and do
+>mkdir build
+>cd build
+>cmake ..
+>make
+>make install (optional)
 
 
 
-
-COMPILING:
-For creating aruco_create_marker and  aruco_test simply type
-> make
-For creating aruco_test_gl type
->make aruco_test_gl
-
-The makefile is only prepared for linux. However, the library should compile in Windows too.
-
-REQUIREMENTS: OpenCv >= 2.1.0. and OpenGL for (aruco_test_gl)
+REQUIREMENTS: OpenCv >= 2.1.0. and OpenGL for (aruco_test_gl and aruco_test_board_gl)
 
 CONTACT: Rafael Munoz-Salinas: rmsalinas@uco.es
 
 FINAL NOTE: this libary is free software and come with no guaratee!
-

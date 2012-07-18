@@ -1,0 +1,4 @@
+VERSION 0.9.5
+  Added support for Boards
+  Added cmake support
+  Bugs fixed
