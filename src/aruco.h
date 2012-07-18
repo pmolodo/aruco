@@ -1,273 +1,104 @@
-#ifndef CV_ARUCO_H
-#define CV_ARUCO_H
-#include <opencv/cv.h>
-#include <opencv/highgui.h>
-#include <cstdio>
-#include <iostream>
-using namespace std;
-using namespace cv;
+/**\mainpage ArUco: Augmented Reality library from the University of Cordoba
 
-namespace aruco
-{
-	/**\brief This class represents a marker
-	 *
-	 */
 
-	class Marker: public vector<Point2f>
-	{
-		public:
-			//id of  the marker
-			int id;
-			//size of the markers sides in meters
-			float ssize;
-			//matrices of rotation and translation respect to the camera
-			Mat Rvec,Tvec;
+ArUco is a minimal C++ library for detection of Augmented Reality markers based on OpenCv exclusively.  
 
-			/**
-			 */
-			Marker()
-			{
-				id=-1;
-				ssize=-1;
-				Rvec.create(3,1,CV_32FC1);
-				Tvec.create(3,1,CV_32FC1);
-				for(int i=0;i<3;i++)
-					Tvec.at<float>(i,0)=Rvec.at<float>(i,0)=-999999;
-			}
-			/**
-			 */
-			Marker(const Marker &M):vector<Point2f>(M)
-			{
-				M.Rvec.copyTo(Rvec);
-				M.Tvec.copyTo(Tvec);
-				id=M.id;
-				ssize=M.ssize;
-			}
-			/**
-			 */
-			~Marker(){}
-			/**Draws this marker in the input image
-			 */
-			void draw(Mat &in, Scalar color, int lineWidth=1,bool writeId=true);
-			
-			/**Given the extrinsic camera parameters returns the GL_MODELVIEW matrix for opengl.
-			 * Setting this matrix, the reference corrdinate system will be set in this marker
-			 */
-			void glGetModelViewMatrix(  double modelview_matrix[16])throw(cv::Exception);
+It is an educational project to show student how to detect augmented reality markers and it is provided under BSD license.
+
+
+\section INTRODUCTION INTRODUCTION
+
+The library relies on the use of coded markers. Each marker has an unique code indicated by the black and white colors in it. The libary detect borders, and analyzes into the rectangular regions which of them are likely to be markers. Then, a decoding is performed and if the code is valid, it is considered that the rectangle is a marker.
+
+The codification included into the marker is a slighly modified version of the Hamming Code. It has a total a 25 bits didived in 5 rows of 5 bits each. So, we have 5 words of 5 bits. Each word, contains only 2 bits of real information, the rest is for  and error detection/correction (error correction is yet to be done). As a conclusion, a marker contains 10 bits of real information wich allows 1024 different markers.
+
+
+\section BOARDS BOARDS
+
+Aruco allows the possibility to employ board. Boards are markers composed by an array of markers arranged in a known order. The advantages of using boards instead of simple markers are:
+ - More robusteness. The misdetection of several markers of the board is not a problem as long as a minimum set of them are detected.
+ - More precision. Since there are a larger number of corners, camera pose estimation becomes more precise.
+
+
+\section APPLICATIONS APPLICATIONS
+
+The library comes with five applications that will help you to learn how to use the library:
+ - aruco_create_marker: which creates marker and saves it in a jpg file you can print.
+ - aruco_simple : simple test aplication that detects the markers in a image 
+ - aruco_test: this is the main application for detection. It reads images either from the camera of from a video and detect markers. Additionally, if you provide the intrinsics of the camera(obtained by OpenCv calibration) and the size of the marker in meters, the library calculates the marker intrinsics so that you can easily create your AR applications.
+ - aruco_test_gl: shows how to use the library AR applications using OpenGL for rendering
+ - aruco_create_board: application that helps you to create a board
+ - aruco_simple_board: simple test aplication that detects a board of markers in a image 
+ - aruco_test_board: application that detects boards
+ - aruco_test_board_gl: application that detects boards and uses OpenGL to draw
+
+\section LIBRARY LIBRARY DESCRIPTION:
+
+The ArUco library contents are divided in two main directories. The src directory, which contains the library itself. And the utils directory which contains the applications.
+
+The library main classes are: 
+   - aruco::CameraParameters: represent the information of the camera that captures the images. Here you must set the calibration info.
+   - aruco::Marker: which represent a marker detected in the image
+   - aruco::MarkerDetector: that is in charge of deteting the markers in a image Detection is done by simple calling the member funcion ArMarkerDetector::detect(). Additionally, the classes contain members to create the required matrices for rendering using OpenGL. See aruco_test_gl for details
+   - aruco::BoardConfiguration: A board is an array of markers in a known order. BoardConfiguracion is the class that defines a board by indicating the id of its markers. In addition, it has informacion about the distance between the markers so that extrinsica camera computations can be done.
+   - aruco::Board: This class defines a board detected in a image. The board has the extrinsic camera parameters as public atributes. In addition, it has a method that allows obtain the matrix for getting its position in OpenGL (see aruco_test_board_gl for details).
+   - aruco::BoardDetector : This is the class in charge of detecting a board in a image. You must pass to it the set of markers detected by ArMarkerDetector and the BoardConfiguracion of the board you want to detect. This class will do the rest for you, even calculating the camera extrinsics.
+
+
+\section COMPILING COMPILING THE LIBRARY:
+\subsection Linux
+Go to the aruco library and do
+\verbatim
+>mkdir build
+>cd build
+>cmake ..
+>make
+>make install (optional)
+\endverbatim
+
+NOTE ON OPENGL: The library supports eaily the integration with OpenGL. In order to compile with support for OpenGL, you just have  installed in your system the develop packages for GL and glut (or freeglut).
+
+\subsection WINDOWS
+
+The library has been compiled using MinGW and codeblocks. Below I describe the best way to compile it that I know. If you know better, please let me know.
+  - step 1) codeblocks
+    -# Download codeblocks. I recommend to download the version 10.5 with mingw included (codeblocks-10.05mingw-setup.exe)
+    -# Install and set the PATH variable so that the codeblock/mingw/bin directory is included. In my case c:/codeblocks/mingw/bin. This will allow cmake to find the compiler.
+    -# The codeblock program will not find the mingw path by deafult. So, run codeblocks and go to setting->Compuiler debugger and set the correct path to the MinGW dir.
+  - step 2) cmake
+     -# Download and install the last version of cmake.
+  - step 3) OpenCv
+      -# Download the source code and compile it using cmake and codeblocks. Note: install the library in C:\ if you want it to be easily detected by cmake afterwards
+  - step 4) aruco
+     -# Download and decompress.
+     -# Open cmake gui application and set the path to the main library directory and also set a path where the project is going to be built. 
+     -# Generate the codeblock project.
+     -# Open the project with codeblock and compile then, install. The programs will be probably generated into the bin directory
+
+OpenGL: by default, the mingw version installed has not the glut library. So, the opengl programs are not compiled.  If you want to compile with OpenGL support, you must install glut, or prefereably freeglut.
+Thus, 
+  - Download the library (http://www.martinpayne.me.uk/software/development/GLUT/freeglut-MinGW.zip) for mingw. 
+  - Decompress in a directory X. 
+  - Then, rerun cmake setting the variable GLU_PATH to that directory (>cmake .. -DGLUT_PATH="C:\X")
+  - Finally, recompile and test. Indeed, you should move the freeglut.dll to the directory with the binaries or to any other place in the PATH.
+
+
+CONCLUSION: Move to Linux, things are simpler :P
+
  
-			/**
-			 */
-			friend bool operator<(const Marker &M1,const Marker&M2)
-			{
-				return M1.id<M2.id;
-			}
-			/**
-			 */
-			friend ostream & operator<<(ostream &str,const Marker &M)
-			{
-				str<<M.id<<"=";
-				for(int i=0;i<4;i++)
-					str<<"("<<M[i].x<< ","<<M[i].y<<") ";
-				str<<"Txyz=";
-				for(int i=0;i<3;i++)
-					str<<M.Tvec.at<float>(i,0)<<" ";
-				str<<"Rxyz=";
-				for(int i=0;i<3;i++)
-					str<<M.Rvec.at<float>(i,0)<<" ";
+\section Testing 
 
-				return str;
-			}
-			
+For testing the applications, the library provides videos and the corresponding camera parameters of these videos. Into the directories you will find information on how to run the examples.
+ 
+\section Final Notes
 
-	};
-	
-	/**\brief Main class for marker detection
-	 *
-	 */
-	class ArMarkerDetector
-	{
-		public:
+ - REQUIREMENTS: OpenCv >= 2.1.0. and OpenGL for (aruco_test_gl and aruco_test_board_gl)
+ - CONTACT: Rafael Munoz-Salinas: rmsalinas@uco.es
+ - This libary is free software and come with no guaratee!
+ 
 
-			/**
-			 */
-			ArMarkerDetector();
+*/
 
-			/**
-			 */
-			~ArMarkerDetector();
-
-			/**Detects the markers in the image passed
-			 *
-			 * If you provide information about the camera parameters and the size of the marker, then, the extrinsics of the markers are detected
-			 *
-			 * @param input input color image
-			 * @param detectedMarkers output vector with the markers detected
-			 * @param camMatrix intrinsic camera information.
-			 * @param distCoeff camera distorsion coefficient. If set Mat() if is assumed no camera distorion
-			 * @param markerSizeMeters size of the marker sides expressed in meters
-			 */
-			void detect(Mat &input,vector<Marker> &detectedMarkers,Mat camMatrix=Mat(),Mat distCoeff=Mat(),float markerSizeMeters=-1) throw (cv::Exception);
-
-			  /**This set the type of thresholding methods available
-			   */
-			  
-			enum ThresholdMethods{FIXED_THRES,ADPT_THRES,CANNY};
-			
-			/**Sets the threshold method
-			 */
-			void setThresholdMethod(ThresholdMethods m){_thresMethod=m;}
-			/**Returns the current threshold method
-			 */
-			ThresholdMethods getThresholdMethod()const{return _thresMethod;}
-			 /**
-			  * Set the parameters of the threshold method
-			  * We are currently using the Adptive threshold ee opencv doc of adaptiveThreshold for more info
-			  *   @param param1: blockSize of the pixel neighborhood that is used to calculate a threshold value for the pixel
-			  *   @param param2: The constant subtracted from the mean or weighted mean
-			  */
-			void setThresholdParams(double param1,double param2){_thresParam1=param1;_thresParam2=param2;}
-			 /**
-			  * Set the parameters of the threshold method
-			  * We are currently using the Adptive threshold ee opencv doc of adaptiveThreshold for more info
-			  *   param1: blockSize of the pixel neighborhood that is used to calculate a threshold value for the pixel
-			  *   param2: The constant subtracted from the mean or weighted mean
-			  */
-			void getThresholdParams(double &param1,double &param2)const {param1=_thresParam1;param2=_thresParam2;}
-
-
-			 /**Returns a reference to the internal image thresholded. It is for visualization purposes and to adjust manually 
-			  * the parameters
-			  */
-			 Mat & getThresholdedImage(){return thres;}
-			 
-			 
-			/**Given the intrinsic camera parameters returns the GL_PROJECTION matrix for opengl.
-			 * PLease NOTE that when using OpenGL, it is assumed no camera distorsion! So, if it is not true, you should have
-			 * undistor image
-			 *
-			 * @param CamMatrix intrinsic parameters of the camera specified.
-			 * @param orgImgSize size of the original image
-			 * @param size of the image/window where to render (can be different from the real camera image). Please not that it must be related to CamMatrix
-			 * @param proj_matrix output projection matrix to give to opengl
-			 * @param gnear,gfar: visible rendering range
-			 * @param invert: indicates if the output projection matrix has to yield a horizontally inverted image because image data has not been stored in the order of glDrawPixels: bottom-to-top.
-			 */
-			static void glGetProjectionMatrix( Mat &  CamMatrix,Size orgImgSize, Size size,double proj_matrix[16],double gnear,double gfar,bool invert=false   )throw(cv::Exception);
-	  private:
-
-			Mat grey,thres,thres2;
-			vector<vector<Point> > contours2;
-			vector<Vec4i> hierarchy2;
-			//Threshold parameters
-			double _thresParam1,_thresParam2;
-			
-			ThresholdMethods _thresMethod;
-			/**Given the iput image with markers, creates an output image with it in the canonical position
-			 * @param in input image
-			 * @param out image with the marker
-			 * @param size of out
-			 * @param points 4 corners of the marker in the image in
-			 */
-			void warp(Mat &in,Mat &out,Size size, vector<Point2f> points)throw (cv::Exception);
-
-			int hammDistMarker(Mat  bits);
-			int mat2id(Mat &bits);
-			/**Correct errors in the markers
-			 */
-			bool correctHammMarker(Mat &bits);
-
-			Mat rotate(Mat  in);
-
-			/**
-			 * @pram nRotations number of 90deg rotations in clowise direction needed to set the marker in correct position
-			 */
-			int getMarkerId(Mat &in,int &nRotations);
-
-			void drawApproxCurve(Mat &in,vector<Point>  &approxCurve ,Scalar color);
-			void drawContour(Mat &in,vector<Point>  &contour,Scalar  );
-			void thresHold(int method,Mat &grey,Mat &out);
-
-			void drawAllContours(Mat input);
-
-			void draw(Mat out,const vector<Marker> &markers );
-			/**
-			 */
-			bool isInto(Mat &contour,vector<Point2f> &b); 
-			/**
-			 */
-			//bool isInto(vector<Point2f> &a,vector<Point2f> &b);
-			/**
-			 */
-			int perimeter(vector<Point2f> &a);
-			/**
-			 */
-			template<typename T>
-				void printMat(Mat M,string info="")
-			{
-
-				cout<<info<<endl;
-				for(int y=0;y<M.rows;y++)
-				{
-					for(int x=0;x<M.cols;x++)
-					{
-						if(sizeof(T)==1)
-							cout<<(int) M.at<T>(y,x)<<" ";
-						else cout<<  M.at<T>(y,x)<<" ";
-					}
-					cout<<endl;
-				}
-			}
-			/**
-			 */
-			template<typename T>
-				void printMat(CvMat   *M,string info="")
-			{
-				cout<<info<<endl;
-				Mat MM(M);
-				for(int y=0;y<MM.rows;y++)
-				{
-					for(int x=0;x<MM.cols;x++)
-					{
-						if(sizeof(T)==1)
-							cout<<(int) MM.at<T>(y,x)<<" ";
-						else cout<<  MM.at<T>(y,x)<<" ";
-					}
-					cout<<endl;
-				}
-			}
-
-			//from ARToolKit
-
-			static void argConvGLcpara2( double cparam[3][4], int width, int height, double gnear, double gfar, double m[16], bool invert )throw(cv::Exception);
-			static int  arParamDecompMat( double source[3][4], double cpara[3][4], double trans[3][4] )throw(cv::Exception);
-			static double norm( double a, double b, double c );
-			static double dot(  double a1, double a2, double a3,
-				double b1, double b2, double b3 );
-			
-			
-			static void rotateXAxis(Mat &rotation);
-
-	};
-
-
-/**
- * Creates an ar marker with the id specified. hamming code is employed 
- * There are a total of 5 rows of 5 cols each
- * Each row encodes a total of 2 bits, so there are 2^10 bits:(0-1023) 
- * Hamming code is employed for error detection/correction
- * The least significative bytes are first (from left-up to to right-bottom)
- * Example: id = 110
- * bin code: 00 01 10 11 10
- * Marker (least significative bit is the leftmost)
- * Note: The first bit, is the inverse of the hamming parity. This avoids the 0 0 0 0 0 to be valid
- * 1st row encodes 00: 1 0 0 0 0 : hex 0x10
- * 2nd row encodes 01: 1 0 1 1 1 : hex 0x17
- * 3nd row encodes 10: 0 1 0 0 1 : hex 0x09
- * 4th row encodes 11: 0 1 1 1 0 : hex 0x0e
- * 5th row encodes 10: 0 1 0 0 1 : hex 0x09
- */
-Mat createMarker(int id,int size) throw (cv::Exception); 
-
-
-};
-#endif
+#include "markerdetector.h"
+#include "boarddetector.h"
+#include "cvdrawingutils.h"

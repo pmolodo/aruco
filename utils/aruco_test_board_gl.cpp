@@ -5,25 +5,25 @@
 #include <GL/gl.h>
 #include <GL/glut.h>
 #include "aruco.h"
-#include "arucoboard.h"
+#include "boarddetector.h"
 #include "common.h"
 using namespace cv;
 using namespace aruco;
 
 string TheInputVideo,TheIntrinsicFile,TheBoardConfigFile;
-
+bool isIntrinsicFileYAML=false;
 bool The3DInfoAvailable=false;
 float TheMarkerSize=-1;
-ArMarkerDetector MDetector;
-ArBoardDetector BDetector;
+MarkerDetector MDetector;
+BoardDetector BDetector;
 VideoCapture TheVideoCapturer;
 vector<Marker> TheMarkers;
 //board
-ArBoardDetector TheBoardDetector;
+BoardDetector TheBoardDetector;
 pair<Board,float> TheBoardDetected; //the board and its probabilit
 BoardConfiguration TheBoardConfig;
-Mat TheInputImage,TheUndInputImage;
-Mat TheIntriscCameraMatrix,TheDistorsionCameraParams,TheResizedImage;
+Mat TheInputImage,TheUndInputImage,TheResizedImage;
+CameraParameters TheCameraParams;
 Size TheGlWindowSize;
 bool TheCaptureFlag=true;
 void readArguments ( int argc,char **argv );
@@ -45,7 +45,7 @@ int main(int argc,char **argv)
 	{
 		if(argc==1) usage();
 		readArguments (argc,argv);
-		if (TheIntrinsicFile==""){cerr<<"-f option required"<<endl;return -1;}
+		if (TheIntrinsicFile==""){cerr<<"-f or -y option required"<<endl;return -1;}
 		if (TheMarkerSize==-1){cerr<<"-s option required"<<endl;return -1;}
 		if(TheBoardConfigFile==""){
 		  cerr<<"The board configuration info must be provided (-b option)"<<endl;
@@ -68,12 +68,11 @@ int main(int argc,char **argv)
 		//read first image
 		TheVideoCapturer>>TheInputImage;
 		//read camera paramters if passed
-		if (!readIntrinsicFile(TheIntrinsicFile,TheIntriscCameraMatrix,TheDistorsionCameraParams,TheInputImage.size()))
-		{
-			cerr<<"could not open file "<<TheIntrinsicFile<<endl;
-			return -1;
-
-		}
+		if (isIntrinsicFileYAML)
+		  TheCameraParams.readFromXMLFile(TheIntrinsicFile);
+		else 
+		  TheCameraParams.readFromFile(TheIntrinsicFile);
+		TheCameraParams.resize( TheInputImage.size());
 
 		glutInit(&argc, argv);
 		glutInitWindowPosition( 0, 0);
@@ -163,12 +162,12 @@ void vDrawScene()
 	glDisable(GL_TEXTURE_2D);
 	glPixelZoom( 1, -1);
 	glRasterPos3f( 0, TheGlWindowSize.height  - 0.5, -1.0 );
-	glDrawPixels ( TheGlWindowSize.width , TheGlWindowSize.height , GL_BGR , GL_UNSIGNED_BYTE , TheResizedImage.ptr(0) );
+	glDrawPixels ( TheGlWindowSize.width , TheGlWindowSize.height , GL_RGB , GL_UNSIGNED_BYTE , TheResizedImage.ptr(0) );
 	///Set the appropriate projection matrix so that rendering is done in a enrvironment
 	//like the real camera (without distorsion)
 	glMatrixMode(GL_PROJECTION);
 	double proj_matrix[16];
-	ArMarkerDetector::glGetProjectionMatrix(TheIntriscCameraMatrix,TheInputImage.size(),TheGlWindowSize,proj_matrix,0.05,10);
+	MarkerDetector::glGetProjectionMatrix(TheCameraParams,TheInputImage.size(),TheGlWindowSize,proj_matrix,0.05,10);
 	glLoadIdentity();
 	glLoadMatrixd(proj_matrix);
 	glLineWidth(2);
@@ -224,12 +223,14 @@ void vIdle()
 	TheVideoCapturer.grab();
 	TheVideoCapturer.retrieve( TheInputImage);
 	TheUndInputImage.create(TheInputImage.size(),CV_8UC3);
+	//by deafult, opencv works in BGR, so we must convert to RGB because OpenGL in windows preffer
+	cv::cvtColor(TheInputImage,TheInputImage,CV_BGR2RGB);
 	//remove distorion in image
-	cv::undistort(TheInputImage,TheUndInputImage, TheIntriscCameraMatrix, TheDistorsionCameraParams);
+	cv::undistort(TheInputImage,TheUndInputImage, TheCameraParams.CameraMatrix,TheCameraParams.Distorsion);
 	//detect markers
-	MDetector.detect(TheUndInputImage,TheMarkers,TheIntriscCameraMatrix,Mat(),TheMarkerSize);
+	MDetector.detect(TheUndInputImage,TheMarkers,TheCameraParams.CameraMatrix,Mat(),TheMarkerSize);
 	//Detection of the board
-	TheBoardDetected.second=TheBoardDetector.detect( TheMarkers, TheBoardConfig,TheBoardDetected.first, TheIntriscCameraMatrix,TheDistorsionCameraParams,TheMarkerSize);
+	TheBoardDetected.second=TheBoardDetector.detect( TheMarkers, TheBoardConfig,TheBoardDetected.first, TheCameraParams,TheMarkerSize);
 	//chekc the speed by calculating the mean speed of all iterations
 	//resize the image to the size of the GL window
 	cv::resize(TheUndInputImage,TheResizedImage,TheGlWindowSize);
@@ -270,7 +271,8 @@ void usage()
 {
 	cout<<"This program test the ArUco Library \n\n";
 	cout<<"-i <video.avi>: specifies a input video file. If not, images from camera are captures"<<endl;
-	cout<<"-f <file>: if you have calibrated your camera, pass calibration information here so as to be able to get 3D marker info"<<endl;
+	cout<<"-f <file.int>: if you have calibrated your camera, pass calibration information here so as to be able to get 3D marker info"<<endl;
+	cout<<"-y <file.yml>: if you have calibrated your camera in yml format as provided by the calibration.cpp aplication in OpenCv >= 2.2"<<endl;
 	cout<<"-b <boardConfiguration.abc>: file with the board configuration"<<endl;
 	cout<<"-s <size>: size of the marker's sides (expressed in meters!)"<<endl;
 }
@@ -282,7 +284,7 @@ void usage()
  *
  *
  ************************************/
-static const char short_options [] = "hi:f:s:b:";
+static const char short_options [] = "hi:f:s:b:y:";
 
 static const struct option
 long_options [] =
@@ -290,6 +292,7 @@ long_options [] =
 	{ "help",           no_argument,   NULL,                 'h' },
 	{ "input",     required_argument,   NULL,           'i' },
 	{ "intFile",     required_argument,   NULL,           'f' },
+	{ "YAMLFile",     required_argument,   NULL,           'y' },
 	{ "size",     required_argument,   NULL,           's' },
 	{ "boardFile",     required_argument,   NULL,           'b' },
 
@@ -327,6 +330,11 @@ void readArguments ( int argc,char **argv )
 				break;
 			case 'f':
 				TheIntrinsicFile=optarg;
+				isIntrinsicFileYAML=false;
+				break;
+			case 'y':
+				TheIntrinsicFile=optarg;
+				isIntrinsicFileYAML=true;
 				break;
 			case 's':
 				TheMarkerSize=atof(optarg);

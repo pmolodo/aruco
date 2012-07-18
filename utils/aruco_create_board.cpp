@@ -1,5 +1,9 @@
-#include "arucoboard.h"
-
+#include "board.h"
+#include <cstdio>
+#include <opencv/cv.h>
+#include <opencv/highgui.h>
+using namespace std;
+using namespace cv;
 int main(int argc,char **argv)
 {
 try{
@@ -14,7 +18,7 @@ try{
  if (argc>=5) FirstMakerId=atoi(argv[4]);
  if (argc>=6) pixSize=atoi(argv[5]);
  aruco::BoardConfiguration BInfo;
- Mat BoardImage=aruco::createBoard(Size(XSize,YSize), pixSize,pixSize*0.2, FirstMakerId,BInfo);
+ Mat BoardImage=aruco::Board::createBoardImage(Size(XSize,YSize), pixSize,pixSize*0.2, FirstMakerId,BInfo);
  imwrite(argv[2],BoardImage);
  BInfo.saveToFile(argv[3]);
   

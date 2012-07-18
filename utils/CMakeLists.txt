@@ -5,8 +5,11 @@ ADD_EXECUTABLE(aruco_create_board aruco_create_board.cpp)
 ADD_EXECUTABLE(aruco_create_marker aruco_create_marker.cpp)
 ADD_EXECUTABLE(aruco_test_board aruco_test_board.cpp)
 ADD_EXECUTABLE(aruco_test aruco_test.cpp)
+ADD_EXECUTABLE(aruco_simple aruco_simple.cpp)
+ADD_EXECUTABLE(aruco_simple_board aruco_simple_board.cpp)
 
-INSTALL(TARGETS aruco_create_board aruco_create_marker aruco_test_board aruco_test RUNTIME DESTINATION bin)
+ 
+INSTALL(TARGETS aruco_simple_board aruco_simple aruco_create_board aruco_create_marker aruco_test_board aruco_test RUNTIME DESTINATION bin)
 
 
 IF(GL_FOUND)

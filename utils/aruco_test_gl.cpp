@@ -11,12 +11,13 @@ using namespace aruco;
 string TheInputVideo;
 string TheIntrinsicFile;
 bool The3DInfoAvailable=false;
+bool isIntrinsicFileYAML=false;
 float TheMarkerSize=-1;
-ArMarkerDetector PPDetector;
+MarkerDetector PPDetector;
 VideoCapture TheVideoCapturer;
 vector<Marker> TheMarkers;
-Mat TheInputImage,TheUndInputImage;
-Mat TheIntriscCameraMatrix,TheDistorsionCameraParams,TheResizedImage;
+Mat TheInputImage,TheUndInputImage,TheResizedImage;
+CameraParameters TheCameraParams;
 Size TheGlWindowSize;
 bool TheCaptureFlag=true;
 bool readIntrinsicFile(string TheIntrinsicFile,Mat & TheIntriscCameraMatrix,Mat &TheDistorsionCameraParams,Size size);
@@ -54,12 +55,11 @@ int main(int argc,char **argv)
 		//read first image
 		TheVideoCapturer>>TheInputImage;
 		//read camera paramters if passed
-		if (!readIntrinsicFile(TheIntrinsicFile,TheIntriscCameraMatrix,TheDistorsionCameraParams,TheInputImage.size()))
-		{
-			cerr<<"could not open file "<<TheIntrinsicFile<<endl;
-			return -1;
-
-		}
+		if (isIntrinsicFileYAML)
+		  TheCameraParams.readFromXMLFile(TheIntrinsicFile);
+		else
+		  TheCameraParams.readFromFile(TheIntrinsicFile);
+		TheCameraParams.resize(TheInputImage.size());
 
 		glutInit(&argc, argv);
 		glutInitWindowPosition( 0, 0);
@@ -149,12 +149,12 @@ void vDrawScene()
 	glDisable(GL_TEXTURE_2D);
 	glPixelZoom( 1, -1);
 	glRasterPos3f( 0, TheGlWindowSize.height  - 0.5, -1.0 );
-	glDrawPixels ( TheGlWindowSize.width , TheGlWindowSize.height , GL_BGR , GL_UNSIGNED_BYTE , TheResizedImage.ptr(0) );
+	glDrawPixels ( TheGlWindowSize.width , TheGlWindowSize.height , GL_RGB , GL_UNSIGNED_BYTE , TheResizedImage.ptr(0) );
 	///Set the appropriate projection matrix so that rendering is done in a enrvironment
 	//like the real camera (without distorsion)
 	glMatrixMode(GL_PROJECTION);
 	double proj_matrix[16];
-	ArMarkerDetector::glGetProjectionMatrix(TheIntriscCameraMatrix,TheInputImage.size(),TheGlWindowSize,proj_matrix,0.05,10);
+	MarkerDetector::glGetProjectionMatrix(TheCameraParams,TheInputImage.size(),TheGlWindowSize,proj_matrix,0.05,10);
 	glLoadIdentity();
 	glLoadMatrixd(proj_matrix);
 
@@ -196,10 +196,12 @@ void vIdle()
 	TheVideoCapturer.grab();
 	TheVideoCapturer.retrieve( TheInputImage);
 	TheUndInputImage.create(TheInputImage.size(),CV_8UC3);
+	//transform color that by default is BGR to RGB because windows systems do not allow reading BGR images with opengl properly
+	cv::cvtColor(TheInputImage,TheInputImage,CV_BGR2RGB);
 	//remove distorion in image
-	cv::undistort(TheInputImage,TheUndInputImage, TheIntriscCameraMatrix, TheDistorsionCameraParams);
+	cv::undistort(TheInputImage,TheUndInputImage, TheCameraParams.CameraMatrix, TheCameraParams.Distorsion);
 	//detect markers
-	PPDetector.detect(TheUndInputImage,TheMarkers,TheIntriscCameraMatrix,Mat(),TheMarkerSize);
+	PPDetector.detect(TheUndInputImage,TheMarkers, TheCameraParams.CameraMatrix,Mat(),TheMarkerSize);
 	//resize the image to the size of the GL window
 	cv::resize(TheUndInputImage,TheResizedImage,TheGlWindowSize);
   }
@@ -240,6 +242,7 @@ void usage()
 	cout<<"This program test the ArUco Library \n\n";
 	cout<<"-i <video.avi>: specifies a input video file. If not, images from camera are captures"<<endl;
 	cout<<"-f <file>: if you have calibrated your camera, pass calibration information here so as to be able to get 3D marker info"<<endl;
+	cout<<"-y <file.yml>: if you have calibrated your camera in yml format as provided by the calibration.cpp aplication in OpenCv >= 2.2"<<endl;
 	cout<<"-s <size>: size of the marker's sides (expressed in meters!)"<<endl;
 
 }
@@ -251,13 +254,14 @@ void usage()
  *
  *
  ************************************/
-static const char short_options [] = "hi:f:s:";
+static const char short_options [] = "hi:f:s:y:";
 
 static const struct option
 long_options [] =
 {
 	{ "help",           no_argument,   NULL,                 'h' },
 	{ "input",     required_argument,   NULL,           'i' },
+	{ "YAMLFile",     required_argument,   NULL,           'y' },
 	{ "intFile",     required_argument,   NULL,           'f' },
 	{ "size",     required_argument,   NULL,           's' },
 
@@ -294,7 +298,12 @@ void readArguments ( int argc,char **argv )
 				TheInputVideo=optarg;
 				break;
 			case 'f':
+				TheIntrinsicFile=optarg;				
+				isIntrinsicFileYAML=false;
+				break;
+			case 'y':
 				TheIntrinsicFile=optarg;
+				isIntrinsicFileYAML=true;
 				break;
 			case 's':
 				TheMarkerSize=atof(optarg);
@@ -305,60 +314,4 @@ void readArguments ( int argc,char **argv )
 		};
 	}
 
-}
-
-
-/************************************
- *
- *
- *
- *
- ************************************/
-bool readIntrinsicFile(string TheIntrinsicFile,Mat & TheIntriscCameraMatrix,Mat &TheDistorsionCameraParams,Size size)
-{
-	//open file
-	ifstream InFile(TheIntrinsicFile.c_str());
-	if (!InFile) return false;
-	char line[1024];
-	InFile.getline(line,1024);	 //skype first line that should contain only comments
-	InFile.getline(line,1024);//read the line with real info
-
-	//transfer to a proper container
-	stringstream InLine;
-	InLine<<line;
-	//Create the matrices
-	TheDistorsionCameraParams.create(4,1,CV_32FC1);
-	TheIntriscCameraMatrix=Mat::eye(3,3,CV_32FC1);
-
-
-	//read intrinsic matrix
-	InLine>>TheIntriscCameraMatrix.at<float>(0,0);//fx
-	InLine>>TheIntriscCameraMatrix.at<float>(1,1); //fy
-	InLine>>TheIntriscCameraMatrix.at<float>(0,2); //cx
-	InLine>>TheIntriscCameraMatrix.at<float>(1,2);//cy
-	//read distorion parameters
-	for(int i=0;i<4;i++) InLine>>TheDistorsionCameraParams.at<float>(i,0);
-
-	//now, read the camera size
-	float width,height;
-	InLine>>width>>height;
-	//resize the camera parameters to fit this image size
-	float AxFactor= float(size.width)/ width;
-	float AyFactor= float(size.height)/ height;
-	TheIntriscCameraMatrix.at<float>(0,0)*=AxFactor;
-	TheIntriscCameraMatrix.at<float>(0,2)*=AxFactor;
-	TheIntriscCameraMatrix.at<float>(1,1)*=AyFactor;
-	TheIntriscCameraMatrix.at<float>(1,2)*=AyFactor;
-
-	//debug
-	cout<<"fx="<<TheIntriscCameraMatrix.at<float>(0,0)<<endl;
-	cout<<"fy="<<TheIntriscCameraMatrix.at<float>(1,1)<<endl;
-	cout<<"cx="<<TheIntriscCameraMatrix.at<float>(0,2)<<endl;
-	cout<<"cy="<<TheIntriscCameraMatrix.at<float>(1,2)<<endl;
-	cout<<"k1="<<TheDistorsionCameraParams.at<float>(0,0)<<endl;
-	cout<<"k2="<<TheDistorsionCameraParams.at<float>(1,0)<<endl;
-	cout<<"p1="<<TheDistorsionCameraParams.at<float>(2,0)<<endl;
-	cout<<"p2="<<TheDistorsionCameraParams.at<float>(3,0)<<endl;
-
-	return true;
 }

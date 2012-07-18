@@ -1,5 +1,4 @@
-#include <opencv/cv.h>
-#include <opencv/highgui.h>
+#include <opencv2/opencv.hpp>
 #include "aruco.h"
 #include <iostream>
 using namespace cv;
@@ -12,7 +11,7 @@ try{
     cerr<<"Usage: <makerid(0:1023)> outfile.jpg sizeInPixels"<<endl;
     return -1;
   }
-  Mat marker=aruco::createMarker(atoi(argv[1]),atoi(argv[3]));
+  Mat marker=aruco::Marker::createMarkerImage(atoi(argv[1]),atoi(argv[3]));
   imwrite(argv[2],marker);
   
   

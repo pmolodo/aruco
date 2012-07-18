@@ -2,8 +2,8 @@
 #include <getopt.h>
 #include <fstream>
 #include <sstream>
-#include "aruco.h"
-#include "arucoboard.h"
+#include <opencv2/opencv.hpp>
+#include "aruco.h" 
 using namespace cv;
 using namespace aruco;
 
@@ -11,21 +11,22 @@ string TheInputVideo;
 string TheIntrinsicFile;
 string TheBoardConfigFile;
 bool The3DInfoAvailable=false;
+bool isIntrinsicFileYAML=false;
 float TheMarkerSize=-1;
-ArMarkerDetector MDetector;
+MarkerDetector MDetector;
 VideoCapture TheVideoCapturer;
 vector<Marker> TheMarkers;
 Mat TheInputImage,TheInputImageCopy;
-Mat TheIntriscCameraMatrix,TheDistorsionCameraParams;
+CameraParameters TheCameraParameters;
 BoardConfiguration TheBoardConfig;
-ArBoardDetector TheBoardDetector;
+BoardDetector TheBoardDetector;
 Board TheBoardDetected;
+string TheOutVideoFilePath;
+cv::VideoWriter VWriter;
+
 void cvTackBarEvents(int pos,void*);
-bool readIntrinsicFile(string TheIntrinsicFile,Mat & TheIntriscCameraMatrix,Mat &TheDistorsionCameraParams,Size size);
 void readArguments ( int argc,char **argv );
 void usage();
-void draw3dBoardAxis(Mat &Image,Board &m,const Mat& cameraMatrix, const Mat& distCoeffs);
-void draw3dBoardCube(Mat &Image,Board &m,const Mat& cameraMatrix, const Mat& distCoeffs);
 pair<double,double> AvrgTime(0,0) ;//determines the average time required for detection
 double ThresParam1,ThresParam2;
 int iThresParam1,iThresParam2;
@@ -60,23 +61,20 @@ int main(int argc,char **argv)
 
 		//read first image to get the dimensions
 		TheVideoCapturer>>TheInputImage;
+
+		//Open outputvideo
+		if ( TheOutVideoFilePath!="")
+		  VWriter.open(TheOutVideoFilePath,CV_FOURCC('M','J','P','G'),15,TheInputImage.size());
 		
 		//read camera parameters if passed
-		if (TheIntrinsicFile=="")
-		{
-			TheIntriscCameraMatrix=Mat();
-			TheDistorsionCameraParams=Mat();
-		}
-		else
-		{
-			if (!readIntrinsicFile(TheIntrinsicFile,TheIntriscCameraMatrix,TheDistorsionCameraParams,TheInputImage.size()))
-				{
-				  cerr<<"could not open file "<<TheIntrinsicFile<<endl;
-				  return -1;				  
-				}
-			The3DInfoAvailable=true;
-
-		}
+		if (TheIntrinsicFile!=""){
+		  if (isIntrinsicFileYAML)
+		    TheCameraParameters.readFromXMLFile(TheIntrinsicFile);
+		  else
+		    TheCameraParameters.readFromFile(TheIntrinsicFile);
+		    TheCameraParameters.resize(TheInputImage.size());
+		} 
+		
 		//Create gui
 		
 		cv::namedWindow("thres",1);
@@ -95,9 +93,9 @@ int main(int argc,char **argv)
 			index++; //number of images captured
 			double tick = (double)getTickCount();//for checking the speed
 			//Detection of markers in the image passed
-			MDetector.detect(TheInputImage,TheMarkers,TheIntriscCameraMatrix,TheDistorsionCameraParams);
+			MDetector.detect(TheInputImage,TheMarkers,TheCameraParameters);
 			//Detection of the board
-			float probDetect=TheBoardDetector.detect( TheMarkers, TheBoardConfig,TheBoardDetected, TheIntriscCameraMatrix,TheDistorsionCameraParams,TheMarkerSize);
+			float probDetect=TheBoardDetector.detect( TheMarkers, TheBoardConfig,TheBoardDetected, TheCameraParameters,TheMarkerSize);
 			//chekc the speed by calculating the mean speed of all iterations
 			AvrgTime.first+=((double)getTickCount()-tick)/getTickFrequency();
 			AvrgTime.second++;			
@@ -107,9 +105,9 @@ int main(int argc,char **argv)
 				TheMarkers[i].draw(TheInputImageCopy,Scalar(0,0,255),1);
 			
 			//print board
-			if (The3DInfoAvailable){
+			if (TheCameraParameters.isValid()){
 			  if ( probDetect>0.2)   {
-				draw3dBoardAxis( TheInputImageCopy,TheBoardDetected,TheIntriscCameraMatrix,TheDistorsionCameraParams);
+			    CvDrawingUtils::draw3dAxis( TheInputImageCopy,TheBoardDetected,TheCameraParameters);
 				//draw3dBoardCube( TheInputImageCopy,TheBoardDetected,TheIntriscCameraMatrix,TheDistorsionCameraParams);
 				}
 			}
@@ -119,9 +117,25 @@ int main(int argc,char **argv)
 			//show input with augmented information and  the thresholded image
 			cv::imshow("in",TheInputImageCopy);			
 			cv::imshow("thres",MDetector.getThresholdedImage());
+			//write to video if required
+			if (  TheOutVideoFilePath!=""){
+			  //create a beautiful compiosed image showing the thresholded
+			  //first create a small version of the thresholded image
+			  cv::Mat smallThres;
+			  cv::resize( MDetector.getThresholdedImage(),smallThres,cvSize(TheInputImageCopy.cols/3,TheInputImageCopy.rows/3));
+			  cv::Mat small3C;
+			  cv::cvtColor(smallThres,small3C,CV_GRAY2BGR);
+			  cv::Mat roi=TheInputImageCopy(cv::Rect(0,0,TheInputImageCopy.cols/3,TheInputImageCopy.rows/3));
+ 			  small3C.copyTo(roi);
+			  VWriter<<TheInputImageCopy;
+// 			 cv::imshow("TheInputImageCopy",TheInputImageCopy);			
+			
+			}
 
 			key=cv::waitKey(0);//wait for key to be pressed
 		}
+		
+		
 	}catch(std::exception &ex)
 
 	{
@@ -145,11 +159,11 @@ ThresParam1=iThresParam1;
 ThresParam2=iThresParam2;
 MDetector.setThresholdParams(ThresParam1,ThresParam2);
 //recompute
-MDetector.detect(TheInputImage,TheMarkers,TheIntriscCameraMatrix,TheDistorsionCameraParams,TheMarkerSize);
+MDetector.detect(TheInputImage,TheMarkers,TheCameraParameters ,TheMarkerSize);
 //Detection of the board
-float probDetect=TheBoardDetector.detect( TheMarkers, TheBoardConfig,TheBoardDetected, TheIntriscCameraMatrix,TheDistorsionCameraParams);
-if (The3DInfoAvailable && probDetect>0.2) 
-    draw3dBoardAxis( TheInputImageCopy,TheBoardDetected,TheIntriscCameraMatrix,TheDistorsionCameraParams);
+float probDetect=TheBoardDetector.detect( TheMarkers, TheBoardConfig,TheBoardDetected, TheCameraParameters);
+if (TheCameraParameters.isValid() && probDetect>0.2) 
+  aruco::CvDrawingUtils::draw3dAxis(TheInputImageCopy,TheBoardDetected,TheCameraParameters);
 
 cv::imshow("in",TheInputImageCopy);			
 cv::imshow("thres",MDetector.getThresholdedImage());
@@ -166,8 +180,10 @@ void usage()
 	cout<<"This program test the ArUco Library \n\n";
 	cout<<"-i <video.avi>: specifies a input video file. If not, images from camera are captures"<<endl;
 	cout<<"-b <boardConfiguration.abc>: file with the board configuration"<<endl;
-	cout<<"-f <file>: if you have calibrated your camera, pass calibration information here so as to be able to get 3D marker info"<<endl;
+	cout<<"-f <file.int>: if you have calibrated your camera, pass calibration information here so as to be able to get 3D marker info"<<endl;
+	cout<<"-y <file.yml>: if you have calibrated your camera in yml format as provided by the calibration.cpp aplication in OpenCv >= 2.2"<<endl;
 	cout<<"-s <size>: size of the marker's sides (expressed in meters!)"<<endl;
+	cout<<"-o video.avi: output video"<<endl;
 }
 
 /************************************
@@ -176,7 +192,7 @@ void usage()
  *
  *
  ************************************/
-static const char short_options [] = "hi:f:s:b:";
+static const char short_options [] = "hi:f:s:b:o:y:";
 
 static const struct option
 long_options [] =
@@ -184,8 +200,10 @@ long_options [] =
 	{ "help",           no_argument,   NULL,                 'h' },
 	{ "input",     required_argument,   NULL,           'i' },
 	{ "intFile",     required_argument,   NULL,           'f' },
+	{ "YAMLFile",     required_argument,   NULL,           'y' },
 	{ "boardFile",     required_argument,   NULL,           'b' },
 	{ "size",     required_argument,   NULL,           's' },
+	{ "output",     required_argument,   NULL,           'o' },
 
 	{ 0, 0, 0, 0 }
 };
@@ -221,6 +239,11 @@ void readArguments ( int argc,char **argv )
 				break;
 			case 'f':
 				TheIntrinsicFile=optarg;
+				isIntrinsicFileYAML=false;
+				break;
+			case 'y':
+				TheIntrinsicFile=optarg;
+				isIntrinsicFileYAML=true;
 				break;
 			case 's':
 				TheMarkerSize=atof(optarg);
@@ -228,130 +251,13 @@ void readArguments ( int argc,char **argv )
 			case 'b':
 				TheBoardConfigFile=optarg;
 				break;
+			case 'o':
+				TheOutVideoFilePath=optarg;
+				break;
 			default:
 				usage ();
 				exit ( EXIT_FAILURE );
 		};
 	}
 
-}
-
-
-/************************************
- *
- *
- *
- *
- ************************************/
-bool readIntrinsicFile(string TheIntrinsicFile,Mat & TheIntriscCameraMatrix,Mat &TheDistorsionCameraParams,Size size)
-{
-	//open file
-	ifstream InFile(TheIntrinsicFile.c_str());
-	if (!InFile) return false;
-	char line[1024];
-	InFile.getline(line,1024);	 //skype first line that should contain only comments
-	InFile.getline(line,1024);//read the line with real info
-
-	//transfer to a proper container
-	stringstream InLine;
-	InLine<<line;
-	//Create the matrices
-	TheDistorsionCameraParams.create(4,1,CV_32FC1);
-	TheIntriscCameraMatrix=Mat::eye(3,3,CV_32FC1);
-	
-
-	//read intrinsic matrix				 
-	InLine>>TheIntriscCameraMatrix.at<float>(0,0);//fx								
-	InLine>>TheIntriscCameraMatrix.at<float>(1,1); //fy								
-	InLine>>TheIntriscCameraMatrix.at<float>(0,2); //cx								 
-	InLine>>TheIntriscCameraMatrix.at<float>(1,2);//cy
-	//read distorion parameters
-	for(int i=0;i<4;i++) InLine>>TheDistorsionCameraParams.at<float>(i,0);
-	
-	//now, read the camera size
-	float width,height;
-	InLine>>width>>height;
-	//resize the camera parameters to fit this image size
-	float AxFactor= float(size.width)/ width;
-	float AyFactor= float(size.height)/ height;
-	TheIntriscCameraMatrix.at<float>(0,0)*=AxFactor;
-	TheIntriscCameraMatrix.at<float>(0,2)*=AxFactor;
-	TheIntriscCameraMatrix.at<float>(1,1)*=AyFactor;
-	TheIntriscCameraMatrix.at<float>(1,2)*=AyFactor;
-
-	//debug
-	cout<<"fx="<<TheIntriscCameraMatrix.at<float>(0,0)<<endl;
-	cout<<"fy="<<TheIntriscCameraMatrix.at<float>(1,1)<<endl;
-	cout<<"cx="<<TheIntriscCameraMatrix.at<float>(0,2)<<endl;
-	cout<<"cy="<<TheIntriscCameraMatrix.at<float>(1,2)<<endl;
-	cout<<"k1="<<TheDistorsionCameraParams.at<float>(0,0)<<endl;
-	cout<<"k2="<<TheDistorsionCameraParams.at<float>(1,0)<<endl;
-	cout<<"p1="<<TheDistorsionCameraParams.at<float>(2,0)<<endl;
-	cout<<"p2="<<TheDistorsionCameraParams.at<float>(3,0)<<endl;
-	
-	return true;
-}
-/************************************
- *
- *
- *
- *
- ************************************/
-void draw3dBoardAxis(Mat &Image,Board &B,const Mat& cameraMatrix, const Mat& distCoeffs)
-{
-
-Mat objectPoints (4,3,CV_32FC1);
-objectPoints.at<float>(0,0)=0;objectPoints.at<float>(0,1)=0;objectPoints.at<float>(0,2)=0;
-objectPoints.at<float>(1,0)=2*TheMarkerSize;objectPoints.at<float>(1,1)=0;objectPoints.at<float>(1,2)=0;
-objectPoints.at<float>(2,0)=0;objectPoints.at<float>(2,1)=2*TheMarkerSize;objectPoints.at<float>(2,2)=0;
-objectPoints.at<float>(3,0)=0;objectPoints.at<float>(3,1)=0;objectPoints.at<float>(3,2)=2*TheMarkerSize;
-
-vector<Point2f> imagePoints;
-projectPoints( objectPoints, B.Rvec,B.Tvec, cameraMatrix,  distCoeffs,   imagePoints);
-//draw lines of different colours
-cv::line(Image,imagePoints[0],imagePoints[1],Scalar(0,0,255),2,CV_AA);
-cv::line(Image,imagePoints[0],imagePoints[2],Scalar(0,255,0),2,CV_AA);
-cv::line(Image,imagePoints[0],imagePoints[3],Scalar(255,0,0),2,CV_AA);
-
-putText(Image,"X", imagePoints[1],FONT_HERSHEY_SIMPLEX, 1, Scalar(0,0,255),2);
-putText(Image,"Y", imagePoints[2],FONT_HERSHEY_SIMPLEX, 1, Scalar(0,255,0),2);
-putText(Image,"Z", imagePoints[3],FONT_HERSHEY_SIMPLEX, 1, Scalar(255,0,0),2);
-
-}
-
-/************************************
- *
- *
- *
- *
- ************************************/
-void draw3dBoardCube(Mat &Image,Board &B,const Mat& cameraMatrix, const Mat& distCoeffs)
-{
-float cubeSize=B[0].ssize;
-float txz=-cubeSize/2;
-Mat objectPoints (8,3,CV_32FC1);
-objectPoints.at<float>(0,0)=txz;objectPoints.at<float>(0,1)=0;objectPoints.at<float>(0,2)=txz;
-objectPoints.at<float>(1,0)=txz+cubeSize;objectPoints.at<float>(1,1)=0;objectPoints.at<float>(1,2)=txz;
-objectPoints.at<float>(2,0)=txz+cubeSize;objectPoints.at<float>(2,1)=cubeSize;objectPoints.at<float>(2,2)=txz;
-objectPoints.at<float>(3,0)=txz;objectPoints.at<float>(3,1)=cubeSize;objectPoints.at<float>(3,2)=txz;
-
-objectPoints.at<float>(4,0)=txz;objectPoints.at<float>(4,1)=0;objectPoints.at<float>(4,2)=txz+cubeSize;
-objectPoints.at<float>(5,0)=txz+cubeSize;objectPoints.at<float>(5,1)=0;objectPoints.at<float>(5,2)=txz+cubeSize;
-objectPoints.at<float>(6,0)=txz+cubeSize;objectPoints.at<float>(6,1)=cubeSize;objectPoints.at<float>(6,2)=txz+cubeSize;
-objectPoints.at<float>(7,0)=txz;objectPoints.at<float>(7,1)=cubeSize;objectPoints.at<float>(7,2)=txz+cubeSize;
-
-vector<Point2f> imagePoints;
-projectPoints( objectPoints,B.Rvec,B.Tvec, cameraMatrix,  distCoeffs,   imagePoints);
-//draw lines of different colours
-for(int i=0;i<4;i++)
-  cv::line(Image,imagePoints[i],imagePoints[(i+1)%4],Scalar(0,0,255),1,CV_AA);
-
-for(int i=0;i<4;i++)
-  cv::line(Image,imagePoints[i+4],imagePoints[4+(i+1)%4],Scalar(0,0,255),1,CV_AA);
-
-for(int i=0;i<4;i++)
-  cv::line(Image,imagePoints[i],imagePoints[i+4],Scalar(0,0,255),1,CV_AA);
-
-/*for(unsigned int i=0;i<imagePoints.size();i++)
-    cout<<imagePoints[i].x<<" "<<imagePoints[i].y<<endl;*/
 }

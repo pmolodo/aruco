@@ -16,7 +16,7 @@ set(PROJECT_SOVERSION "${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}")
 #------------------------------------------------------
 
 IF(NOT CMAKE_BUILD_TYPE )
-   SET( CMAKE_BUILD_TYPE "Debug" )
+   SET( CMAKE_BUILD_TYPE "Release" )
 ENDIF()
 
 #------------------------------------------------------
@@ -38,17 +38,25 @@ endif()
 # ----------------------------------------------------------------------------
 FIND_PACKAGE(OpenCV 	REQUIRED)
 set (REQUIRED_LIBRARIES ${OpenCV_LIBS})
-##LOOK FOR OPENGL AND GLUT
-find_package(OpenGL )
-find_package(GLUT )#standard package
-if(NOT GLUT_FOUND) #else, freeglut
-    FIND_LIBRARY(GLUT_glut_LIBRARY     NAMES freeglut)
+
+IF(EXISTS ${GLUT_PATH})
+    INCLUDE_DIRECTORIES(${GLUT_PATH}/include)
+    SET(CMAKE_LIBRARY_PATH ${CMAKE_LIBRARY_PATH} ${GLUT_PATH}/lib)
 ENDIF()
 
+##LOOK FOR OPENGL AND GLUT
+find_package(OpenGL)
+find_package(GLUT)#standard package
+
+MESSAGE(STATUS "GLUT_FOUND=${GLUT_FOUND} OPENGL_gl_LIBRARY=${OPENGL_gl_LIBRARY} GLUT_HEADER=${GLUT_HEADER}")
+if(NOT GLUT_FOUND) #else, freeglut
+    FIND_LIBRARY(GLUT_glut_LIBRARY     NAMES freeglut)
+    MESSAGE(STATUS "GLUT_glut_LIBRARY=${GLUT_glut_LIBRARY}")
+ENDIF()
 IF ( (NOT GLUT_glut_LIBRARY AND NOT GLUT_FOUND) OR NOT OPENGL_gl_LIBRARY)
-    set(GL_FOUND 0)
+    set(GL_FOUND "NO")
 ELSE()
-   set(GL_FOUND 1)
+   set(GL_FOUND "YES")
   set (OPENGL_LIBS  ${OPENGL_gl_LIBRARY} ${OPENGL_glu_LIBRARY} ${GLUT_glut_LIBRARY})
 ENDIF()
 
@@ -59,7 +67,14 @@ ENDIF()
 #   force some variables that could be defined in the command line to be written to cache
 # ----------------------------------------------------------------------------
 OPTION(BUILD_SHARED_LIBS 	"Set to OFF to build static libraries" ON)
-OPTION(INSTALL_DOC 	"Set to OFF to skip build/install Documentation" OFF)
+
+FIND_PACKAGE(Doxygen)
+IF (DOXYGEN_FOUND)
+  OPTION(INSTALL_DOC 	"Set to OFF to skip build/install Documentation" ON)
+ELSE()
+  OPTION(INSTALL_DOC 	"Set to OFF to skip build/install Documentation" OFF)
+ENDIF()
+
 IF (WIN32)
    SET(RUNTIME_OUTPUT_PATH ${PROJECT_BINARY_DIR}/bin CACHE PATH "Directory for dlls and binaries")
    SET(EXECUTABLE_OUTPUT_PATH ${PROJECT_BINARY_DIR}/bin CACHE PATH "Directory for binaries")
@@ -245,10 +260,7 @@ message( STATUS "GNU libraries include dir: ${GNULIBS_INCLUDE_DIR}")
 message( STATUS "GNU libraries dir: 	    ${GNULIBS_PATH}")
 endif	()
 
-MESSAGE( STATUS "WS2_32_LIBRARY = ${WS2_32_LIBRARY} ${wsock32_LIBRARY}" )
-MESSAGE( STATUS "WS2_32 = ${WS2_32}" )
-MESSAGE( STATUS "IPHLPAPI = ${IPHLPAPI}" )
-MESSAGE( STATUS "REQUIRED_LIBRARIES = ${REQUIRED_LIBRARIES}" )
+#MESSAGE( STATUS "REQUIRED_LIBRARIES = ${REQUIRED_LIBRARIES}" )
 
 MESSAGE( STATUS )
 MESSAGE( STATUS "CMAKE_SYSTEM_PROCESSOR = ${CMAKE_SYSTEM_PROCESSOR}" )
@@ -265,12 +277,10 @@ MESSAGE( STATUS "USE_LATEX = ${USE_LATEX}" )
 MESSAGE( STATUS "USE_DOT = ${USE_DOT}" )
 MESSAGE( STATUS "USE_CHM = ${USE_CHM}" )
 MESSAGE( STATUS )
-MESSAGE( STATUS "FOUND OPENGL=${GL_FOUND} LIBS=${OPENGL_LIBS}")
-MESSAGE( STATUS "LIBS=${REQUIRED_LIBRARIES}")
+MESSAGE( STATUS "FOUND OPENGL=${GL_FOUND}    LIBS=${OPENGL_LIBS}")
 MESSAGE( STATUS "OpenCV_LIB_DIR=${OpenCV_LIB_DIR}")
-
 MESSAGE( STATUS "CMAKE_INSTALL_PREFIX=${CMAKE_BINARY_DIR}")
-
+MESSAGE( STATUS )
 MESSAGE( STATUS )
 MESSAGE( STATUS "Change a value with: cmake -D<Variable>=<Value>" )
 MESSAGE( STATUS )
