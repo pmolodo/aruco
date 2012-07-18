@@ -1,45 +1,36 @@
+/*****************************
+Copyright 2011 Rafael Muñoz Salinas. All rights reserved.
+
+Redistribution and use in source and binary forms, with or without modification, are
+permitted provided that the following conditions are met:
+
+   1. Redistributions of source code must retain the above copyright notice, this list of
+      conditions and the following disclaimer.
+
+   2. Redistributions in binary form must reproduce the above copyright notice, this list
+      of conditions and the following disclaimer in the documentation and/or other materials
+      provided with the distribution.
+
+THIS SOFTWARE IS PROVIDED BY Rafael Muñoz Salinas ''AS IS'' AND ANY EXPRESS OR IMPLIED
+WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND
+FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL Rafael Muñoz Salinas OR
+CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
+ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
+ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+The views and conclusions contained in the software and documentation are those of the
+authors and should not be interpreted as representing official policies, either expressed
+or implied, of Rafael Muñoz Salinas.
+********************************/
 #include "board.h"
 #include <fstream>
 using namespace std;
 using namespace cv;
 namespace aruco {
 
-cv::Mat Board::createBoardImage( Size gridSize,int MarkerSize,int MarkerDistance,unsigned int FirstMarkerID, BoardConfiguration& TInfo  ) throw (cv::Exception)
-{
-
-    vector<vector<int> > MarkersIds;
-//     vector<vector<int> > *TheMarkersIds=NULL;
-
-    srand(time(NULL));
-    TInfo._markersId.create(gridSize,CV_32SC1);
-    int nMarkers=gridSize.height*gridSize.width;
-    if (FirstMarkerID+nMarkers>=1024)
-        throw cv::Exception(9189,"Creation of board impies a marker with an impossible id:","aruco::createBoard",__FILE__,__LINE__);
-    unsigned int idp=0;
-    for (  int i=0;i<gridSize.height;i++)
-        for (  int j=0;j<gridSize.width;j++,idp++)
-            TInfo._markersId.at<int>(i,j)=FirstMarkerID+idp; //number in the range [0,1023]
-
-
-
-
-    TInfo._markerSizePix=MarkerSize;
-    TInfo._markerDistancePix=MarkerDistance;
-
-    int sizeY=gridSize.height*MarkerSize+(gridSize.height-1)*MarkerDistance;
-    int sizeX=gridSize.width*MarkerSize+(gridSize.width-1)*MarkerDistance;
-
-    Mat tableImage(sizeY,sizeX,CV_8UC1);
-    tableImage.setTo(Scalar(255));
-    for (int y=0;y<gridSize.height;y++)
-        for (int x=0;x<gridSize.width;x++) {
-            Mat subrect(tableImage,Rect( x*(MarkerDistance+MarkerSize),y*(MarkerDistance+MarkerSize),MarkerSize,MarkerSize));
-            Mat marker=Marker::createMarkerImage( TInfo._markersId.at<int>(y,x),MarkerSize);
-            marker.copyTo(subrect);
-        }
-
-    return tableImage;
-}
 /**
 *
 *

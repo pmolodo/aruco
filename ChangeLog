@@ -1,5 +1,18 @@
+VERSION 1.1.0
+  - Ogre integration (    Board::OgreGetPoseParameters and Marker::OgreGetPoseParameters).
+  - Changes to make it compile with MSVC 2010
+  - Remove getopt.h dependency. Command line are simpler now
+  - MarkerDetector: Externalization of the marker detector to allow using user-defined markers. The function setMakerDetectorFunction allows to define this function
+  - Added class FiducidalMarkers to detect the original aruco markers 
+  - MarkerDetector: function glGetProjectionMatrix is moved to the CameraParameters class. Sorry, but it is more logical.
+  - MarkerDetector: Clear separation between the detection phases into separated functions that can be externally called (thresHold and detectRectangles) for more sohpisticated user needs
+  - MarkerDetector: new corner refinement method based on harris detector. Also, added the possibility of not refining corners at all.
+  - Added an option to work on a reduced version of the images (pyrDown).
+  - Changes the adaptive threshold method. Now we employ the MEAN. As a consequence, the process is faster and do not depen on the window size.
+  - Initial tests with android
+  - Bugs fixed
 VERSION 1.0.0
-  -  New names for the main classes Marker,MarkerDector... etc. Sorry, but I needed to clear up things. I wont be difficult to adapt.
+  -  New names for the main classes Marker,MarkerDector... etc. Sorry, but I needed to clear up things. It wont be difficult to adapt.
   -  A new class for the camera parameters. It can be readed from the calibration.cpp application in OpenCv2.2
   -  Refactorization of code to make it more maintainable
   -  Better support for Windows (Cmake) and OpenGL

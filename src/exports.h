@@ -25,30 +25,22 @@ The views and conclusions contained in the software and documentation are those 
 authors and should not be interpreted as representing official policies, either expressed
 or implied, of Rafael Muñoz Salinas.
 ********************************/
-#include <opencv2/opencv.hpp>
-#include <iostream>
-#include "aruco.h"
-#include "arucofidmarkers.h"
-using namespace cv;
-using namespace std;
  
-int main(int argc,char **argv)
-{
-try{
-  if (argc!=4){
-    
-    //You can also use ids 2000-2007 but it is not safe since there are a lot of false positives.
-    cerr<<"Usage: <makerid(0:1023)> outfile.jpg sizeInPixels"<<endl;
-    return -1;
-  } 
-  Mat marker=aruco::FiducidalMarkers::createMarkerImage(atoi(argv[1]),atoi(argv[3]));
-  cv::imwrite(argv[2],marker);
 
-}
-catch(std::exception &ex)
-{
-    cout<<ex.what()<<endl;
-}
 
-}
+#ifndef __OPENARUCO_CORE_TYPES_H__
+#define __OPENARUCO_CORE_TYPES_H__
 
+#if !defined _CRT_SECURE_NO_DEPRECATE && _MSC_VER > 1300
+#define _CRT_SECURE_NO_DEPRECATE /* to avoid multiple Visual Studio 2005 warnings */
+#endif
+
+
+#if (defined WIN32 || defined _WIN32 || defined WINCE)   && defined DSO_EXPORTS
+     #define ARUCO_EXPORTS __declspec(dllexport)  
+#else
+    #define ARUCO_EXPORTS  
+#endif
+
+
+#endif
