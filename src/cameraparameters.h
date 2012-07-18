@@ -79,7 +79,7 @@ public:
     void readFromFile(string path)throw(cv::Exception);
     /**Saves this to a file
      */
-    void saveToFile(string path)throw(cv::Exception);
+    void saveToFile(string path,bool inXML=true)throw(cv::Exception);
 
     /**Reads from a YAML file generated with the opencv2.2 calibration utility
      */

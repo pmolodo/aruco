@@ -45,7 +45,7 @@ int main(int argc,char **argv)
 {
 	try
 	{
-		if(argc<3) {cerr<<"Usage: image  boardConfig [cameraParams.yml] [markerSize]  [outImage]"<<endl;exit(0);}
+		if(argc<3) {cerr<<"Usage: image  boardConfig.yml [cameraParams.yml] [markerSize]  [outImage]"<<endl;exit(0);}
 		aruco::CameraParameters CamParam;
 		MarkerDetector MDetector;
 		vector<Marker> Markers;
@@ -56,17 +56,20 @@ int main(int argc,char **argv)
 		
 		cv::Mat InImage=cv::imread(argv[1]);
 		TheBoardConfig.readFromFile(argv[2]);
-		if (argc>=4) CamParam.readFromXMLFile(argv[3]);
-		//resizes the parameters to fit the size of the input image
-		CamParam.resize( InImage.size());
+		if (argc>=4) {
+		  CamParam.readFromXMLFile(argv[3]);
+		  //resizes the parameters to fit the size of the input image
+		  CamParam.resize( InImage.size());
+		}
 
-		if (argc>=5) MarkerSize=atof(argv[4]);
+		if (argc>=5) 
+		  MarkerSize=atof(argv[4]);
 		
 		cv::namedWindow("in",1);
-		MDetector.detect(InImage,Markers,CamParam,MarkerSize);
+		MDetector.detect(InImage,Markers);//detect markers without computing R and T information
 		//Detection of the board
 		float probDetect=TheBoardDetector.detect( Markers, TheBoardConfig,TheBoardDetected, CamParam,MarkerSize);
-			
+		
 		//for each marker, draw info and its boundaries in the image
 		for(unsigned int i=0;i<Markers.size();i++){
 			cout<<Markers[i]<<endl;
@@ -75,10 +78,12 @@ int main(int argc,char **argv)
 
 		//draw a 3d cube in each marker if there is 3d info
 		if (  CamParam.isValid()){
-		  for(unsigned int i=0;i<Markers.size();i++){
-		    CvDrawingUtils::draw3dCube(InImage,Markers[i],CamParam);
-		  }
+ 		  for(unsigned int i=0;i<Markers.size();i++){
+ 		    CvDrawingUtils::draw3dCube(InImage,Markers[i],CamParam);
+ 		    CvDrawingUtils::draw3dAxis(InImage,Markers[i],CamParam);
+ 		  }
 		  CvDrawingUtils::draw3dAxis(InImage,TheBoardDetected,CamParam);
+		  cout<<TheBoardDetected.Rvec<<" "<<TheBoardDetected.Tvec<<endl;
 		}
 		//draw board axis
 		

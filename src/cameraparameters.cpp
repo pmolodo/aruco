@@ -70,17 +70,18 @@ void CameraParameters::setParams(cv::Mat cameraMatrix,cv::Mat distorsionCoeff,cv
     if (cameraMatrix.rows!=3 || cameraMatrix.cols!=3)
         throw cv::Exception(9000,"invalid input cameraMatrix","CameraParameters::setParams",__FILE__,__LINE__);
     cameraMatrix.convertTo(CameraMatrix,CV_32FC1);
-    if (  distorsionCoeff.total()<4 ||  distorsionCoeff.total()>5 )
+    if (  distorsionCoeff.total()<4 ||  distorsionCoeff.total()>=7 )
         throw cv::Exception(9000,"invalid input distorsionCoeff","CameraParameters::setParams",__FILE__,__LINE__);
     cv::Mat auxD;
-    distorsionCoeff.convertTo( auxD,CV_32FC1);
-    //now, get only the 4 first elements
 
-    Distorsion.create(1,4,CV_32FC1);
-    for (int i=0;i<4;i++)
-        Distorsion.ptr<float>(0)[i]=auxD.ptr<float>(0)[i];
+    distorsionCoeff.convertTo( Distorsion,CV_32FC1);
+
+//     Distorsion.create(1,4,CV_32FC1);
+//     for (int i=0;i<4;i++)
+//         Distorsion.ptr<float>(0)[i]=auxD.ptr<float>(0)[i];
 
     CamSize=size;
+
 }
 
 /**
@@ -136,22 +137,31 @@ void CameraParameters::readFromFile(string path)throw(cv::Exception)
 }
 /**Saves this to a file
   */
-void CameraParameters::saveToFile(string path)throw(cv::Exception)
+void CameraParameters::saveToFile(string path,bool inXML)throw(cv::Exception)
 {
     if (!isValid())  throw cv::Exception(9006,"invalid object","CameraParameters::saveToFile",__FILE__,__LINE__);
-    ofstream file(path.c_str());
-    if (!file)  throw cv::Exception(9006,"could not open file:"+path,"CameraParameters::saveToFile",__FILE__,__LINE__);
-    file<<"# Aruco 1.0 CameraParameters"<<endl;
-    file<<"fx = "<<CameraMatrix.at<float>(0,0)<<endl;
-    file<<"cx = "<<CameraMatrix.at<float>(0,2)<<endl;
-    file<<"fy = "<<CameraMatrix.at<float>(1,1)<<endl;
-    file<<"cy = "<<CameraMatrix.at<float>(1,2)<<endl;
-    file<<"k1 = "<<Distorsion.at<float>(0,0)<<endl;
-    file<<"k2 = "<<Distorsion.at<float>(1,0)<<endl;
-    file<<"p1 = "<<Distorsion.at<float>(2,0)<<endl;
-    file<<"p2 = "<<Distorsion.at<float>(3,0)<<endl;
-    file<<"width = "<<CamSize.width<<endl;
-    file<<"height = "<<CamSize.height<<endl;
+    if (!inXML) {
+        ofstream file(path.c_str());
+        if (!file)  throw cv::Exception(9006,"could not open file:"+path,"CameraParameters::saveToFile",__FILE__,__LINE__);
+        file<<"# Aruco 1.0 CameraParameters"<<endl;
+        file<<"fx = "<<CameraMatrix.at<float>(0,0)<<endl;
+        file<<"cx = "<<CameraMatrix.at<float>(0,2)<<endl;
+        file<<"fy = "<<CameraMatrix.at<float>(1,1)<<endl;
+        file<<"cy = "<<CameraMatrix.at<float>(1,2)<<endl;
+        file<<"k1 = "<<Distorsion.at<float>(0,0)<<endl;
+        file<<"k2 = "<<Distorsion.at<float>(1,0)<<endl;
+        file<<"p1 = "<<Distorsion.at<float>(2,0)<<endl;
+        file<<"p2 = "<<Distorsion.at<float>(3,0)<<endl;
+        file<<"width = "<<CamSize.width<<endl;
+        file<<"height = "<<CamSize.height<<endl;
+    }
+    else {
+        cv::FileStorage fs(path,cv::FileStorage::WRITE);
+        fs<<"image_width" << CamSize.width;
+        fs<<"image_height" << CamSize.height;
+        fs<<"camera_matrix" << CameraMatrix;
+        fs<<"distortion_coefficients" <<Distorsion;
+    }
 }
 
 /**Adjust the parameters to the size of the image indicated
@@ -407,31 +417,31 @@ int CameraParameters::arParamDecompMat( double source[3][4], double cpara[3][4],
 
 
 /******
- * 
+ *
  */
 void CameraParameters::OgreGetProjectionMatrix(cv::Size orgImgSize, cv::Size size, double proj_matrix[16], double gnear, double gfar, bool invert) throw(cv::Exception)
 {
-  double temp_matrix[16];
-  (*this).glGetProjectionMatrix(orgImgSize, size, temp_matrix, gnear, gfar, invert);
-  proj_matrix[0]=-temp_matrix[0];
-  proj_matrix[1]=-temp_matrix[4];
-  proj_matrix[2]=-temp_matrix[8];
-  proj_matrix[3]=temp_matrix[12];
-  
-  proj_matrix[4]=-temp_matrix[1];
-  proj_matrix[5]=-temp_matrix[5];
-  proj_matrix[6]=-temp_matrix[9];
-  proj_matrix[7]=temp_matrix[13];
-  
-  proj_matrix[8]=-temp_matrix[2];
-  proj_matrix[9]=-temp_matrix[6];
-  proj_matrix[10]=-temp_matrix[10];
-  proj_matrix[11]=temp_matrix[14];
-  
-  proj_matrix[12]=-temp_matrix[3];
-  proj_matrix[13]=-temp_matrix[7];
-  proj_matrix[14]=-temp_matrix[11];
-  proj_matrix[15]=temp_matrix[15];
+    double temp_matrix[16];
+    (*this).glGetProjectionMatrix(orgImgSize, size, temp_matrix, gnear, gfar, invert);
+    proj_matrix[0]=-temp_matrix[0];
+    proj_matrix[1]=-temp_matrix[4];
+    proj_matrix[2]=-temp_matrix[8];
+    proj_matrix[3]=temp_matrix[12];
+
+    proj_matrix[4]=-temp_matrix[1];
+    proj_matrix[5]=-temp_matrix[5];
+    proj_matrix[6]=-temp_matrix[9];
+    proj_matrix[7]=temp_matrix[13];
+
+    proj_matrix[8]=-temp_matrix[2];
+    proj_matrix[9]=-temp_matrix[6];
+    proj_matrix[10]=-temp_matrix[10];
+    proj_matrix[11]=temp_matrix[14];
+
+    proj_matrix[12]=-temp_matrix[3];
+    proj_matrix[13]=-temp_matrix[7];
+    proj_matrix[14]=-temp_matrix[11];
+    proj_matrix[15]=temp_matrix[15];
 }
 
 

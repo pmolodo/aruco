@@ -1,3 +1,17 @@
+VERSION 1.2.x
+  
+  - Changes in boardconfiguration and boardetector to allow arbitrary located markers. No API changes involved, except for the config files that have changed their format.
+  - Changes in arucofidmarkers to allow the creation of chessboard like boards  (FiducidalMarkers::createBoardImage_ChessBoard).
+          Added the corresponding change in aruco_create_board to support such feature
+  - Added experimental code for removing the deformation that occurs when a marker is in a cylinder
+  - Added the corner refinement method LINES. It is based on intersecting the lines of the marker's sides using the contour points. 
+    We believe this is the best refinement method of the library so far.
+  - Added functionality in aruco::BoarDetector to perform the whole detection process in it if desired
+  - Changed aruco_test_board to use the new functionality described above
+  - Changed old way of obtaining extrinsics FindExtrinsicParam2 for the new one solvePnp in BoardDetector and in Marker
+
+
+ 
 VERSION 1.1.0
   - Ogre integration (    Board::OgreGetPoseParameters and Marker::OgreGetPoseParameters).
   - Changes to make it compile with MSVC 2010

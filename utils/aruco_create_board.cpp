@@ -34,30 +34,42 @@ using namespace std;
 using namespace cv;
 int main(int argc,char **argv)
 {
-try{
-  if (argc<4){
-    cerr<<"Usage: X:Y boardImage.png boardConfiguration.abc [FirstMakerId(0)] [pixSize] [interMarkerDistance(0,1)]"<<endl;
-    return -1;
-  }
- int XSize,YSize;
- if (sscanf(argv[1],"%d:%d",&XSize,&YSize)!=2) {cerr<<"Incorrect X:Y specification"<<endl;return -1;}
- int pixSize=100;
- int FirstMakerId=0;
- float interMarkerDistance=0.2;
- if (argc>=5) FirstMakerId=atoi(argv[4]);
- if (argc>=6) pixSize=atoi(argv[5]);
- if (argc>=7) interMarkerDistance=atoi(argv[6]);
- aruco::BoardConfiguration BInfo;
- Mat BoardImage=aruco::FiducidalMarkers::createBoardImage(Size(XSize,YSize), pixSize,pixSize*0.2, FirstMakerId,BInfo);
- imwrite(argv[2],BoardImage);
- BInfo.saveToFile(argv[3]);
-  
-    
-}
-catch(std::exception &ex)
-{
-    cout<<ex.what()<<endl;
-}
+    try {
+        if (argc<4) {
+            cerr<<"Usage: X:Y boardImage.png boardConfiguration.yml [pixSize] [Type(0: panel,1: chessboard, 2: frame)] [interMarkerDistance(0,1)]"<<endl;
+            return -1;
+        }
+        int XSize,YSize;
+        if (sscanf(argv[1],"%d:%d",&XSize,&YSize)!=2) {
+            cerr<<"Incorrect X:Y specification"<<endl;
+            return -1;
+        }
+        int pixSize=100;
+        float interMarkerDistance=0.2;
+        bool isChessBoard=false;
+	int typeBoard=0;
+        if (argc>=5) pixSize=atoi(argv[4]);
+        if (argc>=6) typeBoard=atoi(argv[5]);
+        if (argc>=7) interMarkerDistance=atoi(argv[6]);
+        aruco::BoardConfiguration BInfo;
+        Mat BoardImage;
+        if (typeBoard==0)
+            BoardImage=aruco::FiducidalMarkers::createBoardImage(Size(XSize,YSize), pixSize,pixSize*0.2,BInfo);
+        else if (typeBoard==1)
+            BoardImage=aruco::FiducidalMarkers::createBoardImage_ChessBoard(Size(XSize,YSize), pixSize,BInfo);
+        else if (typeBoard==2)
+            BoardImage=aruco::FiducidalMarkers::createBoardImage_Frame(Size(XSize,YSize), pixSize,pixSize*0.2,BInfo);
+	  
+	  else {cerr<<"Incorrect board type"<<typeBoard<<endl;return -1;}
+	  
+        imwrite(argv[2],BoardImage);
+        BInfo.saveToFile(argv[3]);
+
+    }
+    catch (std::exception &ex)
+    {
+        cout<<ex.what()<<endl;
+    }
 
 }
 

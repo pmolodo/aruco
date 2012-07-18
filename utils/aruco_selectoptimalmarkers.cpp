@@ -152,7 +152,7 @@ int main(int argc,char **argv)
             for (int j=0;j<distances.cols;j++) {
                 if (!usedMarkers[j]) {
                     int minDist=std::numeric_limits< int >::max();
-                    for (int k=0;k<selectedMarkers.size();k++)
+                    for (size_t k=0;k<selectedMarkers.size();k++)
 			if (distances.at<int> ( selectedMarkers[k], j)<minDist) minDist=distances.at<int> ( selectedMarkers[k], j);
 // 		    cout<<"j="<<j<<" "<<distSum<<"|"<<flush;
 		    if (minDist>shorterDist){ 

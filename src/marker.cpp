@@ -246,17 +246,18 @@ void Marker::draw(Mat &in, Scalar color, int lineWidth ,bool writeId)const
 
 /**
  */
-void Marker::calculateExtrinsics(float markerSize,const CameraParameters &CP)throw(cv::Exception)
+void Marker::calculateExtrinsics(float markerSize,const CameraParameters &CP,bool setYPerperdicular)throw(cv::Exception)
 {
     if (!CP.isValid()) throw cv::Exception(9004,"!CP.isValid(): invalid camera parameters. It is not possible to calculate extrinsics","calculateExtrinsics",__FILE__,__LINE__);
-    calculateExtrinsics( markerSize,CP.CameraMatrix,CP.Distorsion);
+    calculateExtrinsics( markerSize,CP.CameraMatrix,CP.Distorsion,setYPerperdicular);
 }
+
 void print(cv::Point3f p,string cad){
  cout<<cad<<" "<<p.x<<" "<<p.y<< " "<<p.z<<endl; 
 }
 /**
  */
-void Marker::calculateExtrinsics(float markerSizeMeters,cv::Mat  camMatrix,cv::Mat distCoeff )throw(cv::Exception)
+void Marker::calculateExtrinsics(float markerSizeMeters,cv::Mat  camMatrix,cv::Mat distCoeff ,bool setYPerperdicular)throw(cv::Exception)
 {
     if (!isValid()) throw cv::Exception(9004,"!isValid(): invalid marker. It is not possible to calculate extrinsics","calculateExtrinsics",__FILE__,__LINE__);
     if (markerSizeMeters<=0)throw cv::Exception(9004,"markerSize<=0: invalid markerSize","calculateExtrinsics",__FILE__,__LINE__);
@@ -291,7 +292,7 @@ void Marker::calculateExtrinsics(float markerSizeMeters,cv::Mat  camMatrix,cv::M
     raux.convertTo(Rvec,CV_32F);
     taux.convertTo(Tvec ,CV_32F);
     //rotate the X axis so that Y is perpendicular to the marker plane
-    rotateXAxis(Rvec);
+   if (setYPerperdicular) rotateXAxis(Rvec);
     ssize=markerSizeMeters; 
     cout<<(*this)<<endl;
     

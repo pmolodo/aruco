@@ -29,12 +29,19 @@ or implied, of Rafael Muñoz Salinas.
 #include <fstream>
 #include <sstream>
 #ifdef __APPLE__
-#include <gl.h>
-#include <GLUT/glut.h>
+  #include <gl.h>
+  #include <GLUT/glut.h>
+#elif _MSC_VER
+  //http://social.msdn.microsoft.com/Forums/eu/vcgeneral/thread/7d6e6fa5-afc2-4370-9a1f-991a76ccb5b7
+  #include <windows.h>
+  #include <GL/gl.h>
+  #include <glut.h>
 #else
-#include <GL/gl.h>
-#include <GL/glut.h>
+  #include <GL/gl.h>
+  #include <GL/glut.h>
 #endif
+
+
 #include "aruco.h"
 #include "boarddetector.h"
 #include "common.h"
@@ -73,7 +80,7 @@ bool readArguments ( int argc,char **argv )
 
     if (argc!=5) {
         cerr<<"Invalid number of arguments"<<endl;
-        cerr<<"Usage: (in.avi|live) boardConfig.abc  intrinsics.yml   size "<<endl;
+        cerr<<"Usage: (in.avi|live) boardConfig.yml  intrinsics.yml   size "<<endl;
         return false;
     }
     TheInputVideo=argv[1];

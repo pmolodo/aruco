@@ -38,14 +38,12 @@ string TheIntrinsicFile;
 string TheBoardConfigFile;
 bool The3DInfoAvailable=false;
 float TheMarkerSize=-1;
-MarkerDetector MDetector;
 VideoCapture TheVideoCapturer;
-vector<Marker> TheMarkers;
 Mat TheInputImage,TheInputImageCopy;
 CameraParameters TheCameraParameters;
 BoardConfiguration TheBoardConfig;
 BoardDetector TheBoardDetector;
-Board TheBoardDetected;
+
 string TheOutVideoFilePath;
 cv::VideoWriter VWriter;
 
@@ -70,7 +68,7 @@ bool readArguments ( int argc,char **argv )
 
     if (argc<3) {
         cerr<<"Invalid number of arguments"<<endl;
-        cerr<<"Usage: (in.avi|live) boardConfig.abc [intrinsics.yml] [size] [out]"<<endl;
+        cerr<<"Usage: (in.avi|live) boardConfig.yml [intrinsics.yml] [size] [out]"<<endl;
         return false;
     }
     TheInputVideo=argv[1];
@@ -88,6 +86,23 @@ bool readArguments ( int argc,char **argv )
 
     return true;
 }
+
+void processKey(char k) {
+    switch (k) {
+    case 's':
+        if (waitTime==0) waitTime=10;
+        else waitTime=0;
+        break;
+
+/*    case 'p':
+        if (MDetector.getCornerRefinementMethod()==MarkerDetector::SUBPIX)
+            MDetector.setCornerRefinementMethod(MarkerDetector::NONE);
+        else
+            MDetector.setCornerRefinementMethod(MarkerDetector::SUBPIX);
+        break;*/
+    }
+}
+
 /************************************
  *
  *
@@ -131,7 +146,9 @@ int main(int argc,char **argv)
 
         cv::namedWindow("thres",1);
         cv::namedWindow("in",1);
-        MDetector.getThresholdParams( ThresParam1,ThresParam2);
+	TheBoardDetector.setParams(TheBoardConfig,TheCameraParameters,TheMarkerSize);
+	TheBoardDetector.getMarkerDetector().getThresholdParams( ThresParam1,ThresParam2);
+	TheBoardDetector.getMarkerDetector().enableErosion(true);//for chessboards
         iThresParam1=ThresParam1;
         iThresParam2=ThresParam2;
         cv::createTrackbar("ThresParam1", "in",&iThresParam1, 13, cvTackBarEvents);
@@ -145,37 +162,34 @@ int main(int argc,char **argv)
             TheInputImage.copyTo(TheInputImageCopy);
             index++; //number of images captured
             double tick = (double)getTickCount();//for checking the speed
-            //Detection of markers in the image passed
-            MDetector.detect(TheInputImage,TheMarkers,TheCameraParameters);
             //Detection of the board
-            float probDetect=TheBoardDetector.detect( TheMarkers, TheBoardConfig,TheBoardDetected, TheCameraParameters,TheMarkerSize);
+            float probDetect=TheBoardDetector.detect(TheInputImage);
             //chekc the speed by calculating the mean speed of all iterations
             AvrgTime.first+=((double)getTickCount()-tick)/getTickFrequency();
             AvrgTime.second++;
             cout<<"Time detection="<<1000*AvrgTime.first/AvrgTime.second<<" milliseconds"<<endl;
             //print marker borders
-            for (unsigned int i=0;i<TheMarkers.size();i++)
-                TheMarkers[i].draw(TheInputImageCopy,Scalar(0,0,255),1);
+            for (unsigned int i=0;i<TheBoardDetector.getDetectedMarkers().size();i++)
+                TheBoardDetector.getDetectedMarkers()[i].draw(TheInputImageCopy,Scalar(0,0,255),1);
 
             //print board
-            if (TheCameraParameters.isValid()) {
+             if (TheCameraParameters.isValid()) {
                 if ( probDetect>0.2)   {
-                    CvDrawingUtils::draw3dAxis( TheInputImageCopy,TheBoardDetected,TheCameraParameters);
+                    CvDrawingUtils::draw3dAxis( TheInputImageCopy,TheBoardDetector.getDetectedBoard(),TheCameraParameters);
                     //draw3dBoardCube( TheInputImageCopy,TheBoardDetected,TheIntriscCameraMatrix,TheDistorsionCameraParams);
                 }
             }
             //DONE! Easy, right?
 
-            cout<<endl<<endl<<endl;
             //show input with augmented information and  the thresholded image
             cv::imshow("in",TheInputImageCopy);
-            cv::imshow("thres",MDetector.getThresholdedImage());
+            cv::imshow("thres",TheBoardDetector.getMarkerDetector().getThresholdedImage());
             //write to video if required
             if (  TheOutVideoFilePath!="") {
                 //create a beautiful compiosed image showing the thresholded
                 //first create a small version of the thresholded image
                 cv::Mat smallThres;
-                cv::resize( MDetector.getThresholdedImage(),smallThres,cvSize(TheInputImageCopy.cols/3,TheInputImageCopy.rows/3));
+                cv::resize( TheBoardDetector.getMarkerDetector().getThresholdedImage(),smallThres,cvSize(TheInputImageCopy.cols/3,TheInputImageCopy.rows/3));
                 cv::Mat small3C;
                 cv::cvtColor(smallThres,small3C,CV_GRAY2BGR);
                 cv::Mat roi=TheInputImageCopy(cv::Rect(0,0,TheInputImageCopy.cols/3,TheInputImageCopy.rows/3));
@@ -186,6 +200,7 @@ int main(int argc,char **argv)
             }
 
             key=cv::waitKey(waitTime);//wait for key to be pressed
+            processKey(key);
         }
 
 
@@ -210,16 +225,15 @@ void cvTackBarEvents(int pos,void*)
     if (ThresParam2<1) ThresParam2=1;
     ThresParam1=iThresParam1;
     ThresParam2=iThresParam2;
-    MDetector.setThresholdParams(ThresParam1,ThresParam2);
+    TheBoardDetector.getMarkerDetector().setThresholdParams(ThresParam1,ThresParam2);
 //recompute
-    MDetector.detect(TheInputImage,TheMarkers,TheCameraParameters ,TheMarkerSize);
 //Detection of the board
-    float probDetect=TheBoardDetector.detect( TheMarkers, TheBoardConfig,TheBoardDetected, TheCameraParameters);
+    float probDetect=TheBoardDetector.detect( TheInputImage);
     if (TheCameraParameters.isValid() && probDetect>0.2)
-        aruco::CvDrawingUtils::draw3dAxis(TheInputImageCopy,TheBoardDetected,TheCameraParameters);
+        aruco::CvDrawingUtils::draw3dAxis(TheInputImageCopy,TheBoardDetector.getDetectedBoard(),TheCameraParameters);
 
     cv::imshow("in",TheInputImageCopy);
-    cv::imshow("thres",MDetector.getThresholdedImage());
+    cv::imshow("thres",TheBoardDetector.getMarkerDetector().getThresholdedImage());
 }
 
 

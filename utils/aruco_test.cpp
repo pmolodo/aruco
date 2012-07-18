@@ -119,6 +119,7 @@ int main(int argc,char **argv)
         cv::namedWindow("thres",1);
         cv::namedWindow("in",1);
         MDetector.getThresholdParams( ThresParam1,ThresParam2);
+        MDetector.setCornerRefinementMethod(MarkerDetector::LINES);
         iThresParam1=ThresParam1;
         iThresParam2=ThresParam2;
         cv::createTrackbar("ThresParam1", "in",&iThresParam1, 13, cvTackBarEvents);
@@ -145,8 +146,15 @@ int main(int argc,char **argv)
             TheInputImage.copyTo(TheInputImageCopy);
             for (unsigned int i=0;i<TheMarkers.size();i++) {
                 cout<<TheMarkers[i]<<endl;
-                TheMarkers[i].draw(TheInputImageCopy,Scalar(0,0,255),2);
+                TheMarkers[i].draw(TheInputImageCopy,Scalar(0,0,255),1);
             }
+            //print other rectangles that contains no valid markers
+            for (unsigned int i=0;i<MDetector.getCandidates().size();i++) {
+                aruco::Marker m( MDetector.getCandidates()[i],999);
+                m.draw(TheInputImageCopy,cv::Scalar(255,0,0));
+            }
+
+
 
             //draw a 3d cube in each marker if there is 3d info
             if (  TheCameraParameters.isValid())
@@ -188,7 +196,13 @@ void cvTackBarEvents(int pos,void*)
 //recompute
     MDetector.detect(TheInputImage,TheMarkers,TheCameraParameters);
     TheInputImage.copyTo(TheInputImageCopy);
-    for (unsigned int i=0;i<TheMarkers.size();i++)	TheMarkers[i].draw(TheInputImageCopy,Scalar(0,0,255),2);
+    for (unsigned int i=0;i<TheMarkers.size();i++)	TheMarkers[i].draw(TheInputImageCopy,Scalar(0,0,255),1);
+    //print other rectangles that contains no valid markers
+    for (unsigned int i=0;i<MDetector.getCandidates().size();i++) {
+        aruco::Marker m( MDetector.getCandidates()[i],999);
+        m.draw(TheInputImageCopy,cv::Scalar(255,0,0));
+    }
+
 //draw a 3d cube in each marker if there is 3d info
     if (TheCameraParameters.isValid())
         for (unsigned int i=0;i<TheMarkers.size();i++)
