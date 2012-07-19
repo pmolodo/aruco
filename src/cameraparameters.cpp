@@ -120,7 +120,7 @@ void CameraParameters::readFromFile(string path)throw(cv::Exception)
         file.getline(line,1024);
         char cmd[20];
         float fval;
-        if ( sscanf(line,"%s = %f",cmd,&fval)==2) {
+        if ( sscanf(line,"%19s = %f",cmd,&fval)==2) {
             string scmd(cmd);
             if (scmd=="fx") CameraMatrix.at<float>(0,0)=fval;
             else if (scmd=="cx") CameraMatrix.at<float>(0,2)=fval;
