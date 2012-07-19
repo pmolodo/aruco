@@ -498,11 +498,11 @@ int findDeformedSidesIdx(const vector<cv::Point> &contour,const vector<int> &idx
     for (int i=0;i<3;i++) {
         cv::Point p1=contour[ idxSegments[i]];
         cv::Point p2=contour[ idxSegments[i+1]];
-        float inv_den=1./ sqrt((p2.x-p1.x)*(p2.x-p1.x)+ (p2.y-p1.y)*(p2.y-p1.y));
+        float inv_den=1./ sqrt(float(( p2.x-p1.x)*(p2.x-p1.x)+ (p2.y-p1.y)*(p2.y-p1.y)));
         //   d=|v^^·r|=(|(x_2-x_1)(y_1-y_0)-(x_1-x_0)(y_2-y_1)|)/(sqrt((x_2-x_1)^2+(y_2-y_1)^2)).
 //         cerr<<"POSS="<<idxSegments[i]<<" "<<idxSegments[i+1]<<endl;
         for (size_t j=idxSegments[i];j<idxSegments[i+1];j++) {
-            float dist=fabs(   (p2.x-p1.x)*(p1.y-contour[j].y)-  (p1.x-contour[j].x)*(p2.y-p1.y))*inv_den;
+            float dist=std::fabs( float(  (p2.x-p1.x)*(p1.y-contour[j].y)-  (p1.x-contour[j].x)*(p2.y-p1.y)) )*inv_den;
             distSum[i]+=dist;
 //             cerr<< dist<<" ";
 //             cv::rectangle(_ssImC,contour[j],contour[j],colors[i],-1);
@@ -515,12 +515,12 @@ int findDeformedSidesIdx(const vector<cv::Point> &contour,const vector<int> &idx
     //for the last one
     cv::Point p1=contour[ idxSegments[0]];
     cv::Point p2=contour[ idxSegments[3]];
-    float inv_den=1./ sqrt((p2.x-p1.x)*(p2.x-p1.x)+ (p2.y-p1.y)*(p2.y-p1.y));
+    float inv_den=1./ std::sqrt(float(( p2.x-p1.x)*(p2.x-p1.x)+ (p2.y-p1.y)*(p2.y-p1.y)));
     //   d=|v^^·r|=(|(x_2-x_1)(y_1-y_0)-(x_1-x_0)(y_2-y_1)|)/(sqrt((x_2-x_1)^2+(y_2-y_1)^2)).
     for (size_t j=0;j<idxSegments[0];j++)
-        distSum[3]+=fabs(   (p2.x-p1.x)*(p1.y-contour[j].y)-  (p1.x-contour[j].x)*(p2.y-p1.y))*inv_den;
+        distSum[3]+=std::fabs(   float((p2.x-p1.x)*(p1.y-contour[j].y)-  (p1.x-contour[j].x)*(p2.y-p1.y)))*inv_den;
     for (size_t j=idxSegments[3];j<contour.size();j++)
-        distSum[3]+=fabs(   (p2.x-p1.x)*(p1.y-contour[j].y)-  (p1.x-contour[j].x)*(p2.y-p1.y))*inv_den;
+        distSum[3]+=std::fabs(   float((p2.x-p1.x)*(p1.y-contour[j].y)-  (p1.x-contour[j].x)*(p2.y-p1.y)))*inv_den;
 
     distSum[3]/=float(  idxSegments[0]+  (contour.size()-idxSegments[3]));
     //now, get the maximum
@@ -634,7 +634,7 @@ bool MarkerDetector::warp_cylinder ( Mat &in,Mat &out,Size size, MarkerCandidate
     //now, transform all points to the new image
     vector<cv::Point> pointsCO(mcand.contour.size());
     assert(M.type()==CV_64F);
-    assert(M.cols==3 and M.rows==3);
+    assert(M.cols==3 && M.rows==3);
 //     cout<<M<<endl;
     double *mptr=M.ptr<double>(0);
     imAux2.setTo(cv::Scalar::all(0));
@@ -672,7 +672,7 @@ bool MarkerDetector::warp_cylinder ( Mat &in,Mat &out,Size size, MarkerCandidate
         }
 //       cout<<"S="<<start<<" "<<end<<" "<<end-start<<" "<<(size.width>>1)<<endl;
         //check that the size is big enough and
-        assert(start!=-1 and end!=-1 and (end-start)> size.width>>1);
+        assert(start!=-1 && end!=-1 && (end-start)> size.width>>1);
         uchar *In_image=imAux.ptr<uchar>(y);
         uchar *Out_image=outIm.ptr<uchar>(y);
         memcpy(Out_image,In_image+start,imAux.cols-start );

@@ -1,7 +1,4 @@
-
-VERSION 1.2.4
-  - Bugs fixed for MSVC2010
-VERSION 1.2.3
+VERSION 1.2.x
   
   - Changes in boardconfiguration and boardetector to allow arbitrary located markers. No API changes involved, except for the config files that have changed their format.
   - Changes in arucofidmarkers to allow the creation of chessboard like boards  (FiducidalMarkers::createBoardImage_ChessBoard).

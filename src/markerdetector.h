@@ -27,8 +27,7 @@ or implied, of Rafael Muñoz Salinas.
 ********************************/
 #ifndef _ARUCO_MarkerDetector_H
 #define _ARUCO_MarkerDetector_H
-#include <opencv/cv.h>
-#include <opencv/highgui.h>
+#include <opencv2/opencv.hpp>
 #include <cstdio>
 #include <iostream>
 #include "cameraparameters.h"

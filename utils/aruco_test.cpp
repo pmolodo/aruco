@@ -149,10 +149,10 @@ int main(int argc,char **argv)
                 TheMarkers[i].draw(TheInputImageCopy,Scalar(0,0,255),1);
             }
             //print other rectangles that contains no valid markers
-            for (unsigned int i=0;i<MDetector.getCandidates().size();i++) {
+       /**     for (unsigned int i=0;i<MDetector.getCandidates().size();i++) {
                 aruco::Marker m( MDetector.getCandidates()[i],999);
                 m.draw(TheInputImageCopy,cv::Scalar(255,0,0));
-            }
+            }*/
 
 
 
@@ -198,10 +198,10 @@ void cvTackBarEvents(int pos,void*)
     TheInputImage.copyTo(TheInputImageCopy);
     for (unsigned int i=0;i<TheMarkers.size();i++)	TheMarkers[i].draw(TheInputImageCopy,Scalar(0,0,255),1);
     //print other rectangles that contains no valid markers
-    for (unsigned int i=0;i<MDetector.getCandidates().size();i++) {
+    /*for (unsigned int i=0;i<MDetector.getCandidates().size();i++) {
         aruco::Marker m( MDetector.getCandidates()[i],999);
         m.draw(TheInputImageCopy,cv::Scalar(255,0,0));
-    }
+    }*/
 
 //draw a 3d cube in each marker if there is 3d info
     if (TheCameraParameters.isValid())
